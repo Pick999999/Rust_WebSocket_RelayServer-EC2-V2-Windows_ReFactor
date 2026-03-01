@@ -1,0 +1,26 @@
+{
+  "name": "gpu-trading-sdk",
+  "version": "1.0.0",
+  "description": "Advanced Trading Indicators and Analysis SDK for Deriv",
+  "main": "dist/trading-sdk.js",
+  "module": "dist/trading-sdk.esm.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w"
+  },
+  "keywords": [
+    "trading",
+    "deriv",
+    "indicators",
+    "smc",
+    "webgpu"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
+    "rollup": "^4.0.0"
+  }
+}

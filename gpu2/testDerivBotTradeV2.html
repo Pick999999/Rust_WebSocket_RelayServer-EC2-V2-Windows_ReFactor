@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deriv Accumulator Bot (Trade Edition) - Fixed</title>
+    <!-- Project Dependencies -->
+    <script src="MultiAssetBundle.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+
+    <style>
+        /* (CSS เหมือนเดิม ไม่เปลี่ยนแปลง) */
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #252526;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 2800px;
+            border: 1px solid #3c3c3c;
+        }
+
+        h1 {
+            color: #4ec9b0;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+
+        .section-title {
+            color: #569cd6;
+            font-size: 18px;
+            border-bottom: 1px solid #3c3c3c;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            margin-top: 20px;
+        }
+
+        .form-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #d4d4d4;
+            font-weight: 500;
+        }
+
+        select,
+        input[type="number"],
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: #4ec9b0;
+            box-shadow: 0 0 5px rgba(78, 201, 176, 0.3);
+        }
+
+        .growth-options {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .growth-option {
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .growth-option.selected {
+            background-color: #4ec9b0;
+            color: #1e1e1e;
+            border-color: #4ec9b0;
+            font-weight: bold;
+        }
+
+        .growth-option:hover:not(.selected) {
+            background-color: #444;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, #0e639c, #1177bb);
+            color: white;
+        }
+
+        button.primary:hover {
+            background: linear-gradient(135deg, #1177bb, #2299dd);
+            box-shadow: 0 4px 12px rgba(17, 119, 187, 0.4);
+        }
+
+        button.stop {
+            background: linear-gradient(135deg, #b91c1c, #ef4444);
+            color: white;
+            display: none;
+        }
+
+        button.stop:hover {
+            background: linear-gradient(135deg, #ef4444, #f87171);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .status-success {
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            color: #4caf50;
+        }
+
+        .status-error {
+            background-color: rgba(244, 67, 54, 0.1);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        .status-info {
+            background-color: rgba(33, 150, 243, 0.1);
+            border: 1px solid #2196f3;
+            color: #2196f3;
+        }
+
+        .tabs {
+            display: flex;
+            margin-top: 25px;
+            background-color: #333;
+            border-radius: 6px 6px 0 0;
+            overflow: hidden;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background-color: #333;
+            color: #aaa;
+            border: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            border-radius: 0;
+            margin-top: 0;
+        }
+
+        .tab-btn:hover {
+            background-color: #444;
+            color: #fff;
+        }
+
+        .tab-btn.active {
+            background-color: #252526;
+            color: #4ec9b0;
+            border-bottom: 2px solid #4ec9b0;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background-color: #2d2d2d;
+            border-radius: 0 0 6px 6px;
+            border: 1px solid #3c3c3c;
+            border-top: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            border: 1px solid #3c3c3c;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #333;
+            color: #ccc;
+        }
+
+        .td-win {
+            color: #4caf50;
+        }
+
+        .td-loss {
+            color: #f44336;
+        }
+
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+            background: #333;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .summary-item strong {
+            display: block;
+            font-size: 18px;
+        }
+
+        pre {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            color: #9cdcfe;
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 13px;
+            margin: 0;
+        }
+
+        .json-key {
+            color: #9cdcfe;
+        }
+
+        .json-string {
+            color: #ce9178;
+        }
+
+        .json-number {
+            color: #b5cea8;
+        }
+
+        .json-boolean {
+            color: #569cd6;
+        }
+
+        .warning-badge {
+            background-color: #f44336;
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .input-warning {
+            border: 1px solid #f44336 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Deriv Accumulator Bot (Trade Edition) - Fixed</h1>
+
+        <!-- Authentication -->
+        <div id="authSection">
+            <div class="form-group">
+                <label for="apiToken">Deriv API Token</label>
+                <!-- 🔐 ไม่มี Hardcoded Token แล้ว -->
+                <input type="password" id="apiToken" placeholder="Enter your API Token" value="" />
+            </div>
+            <button class="primary" onclick="connectAndAuthorize()">
+                🔐 Connect
+            </button>
+        </div>
+
+        <!-- Chart Tabs -->
+        <div class="tabs" style="justify-content: flex-start; margin-bottom: 5px">
+            <button class="tab-btn active" onclick="switchChartTab('tick')">
+                Tick Line
+            </button>
+            <button class="tab-btn" id="candleTabBtn" onclick="switchChartTab('candle')">
+                Candles (10s)
+            </button>
+        </div>
+
+        <!-- Chart Section -->
+        <div id="chartSection" style="
+                    margin-bottom: 20px;
+                    border: 1px solid #3c3c3c;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    background: #1e1e1e;
+                ">
+            <div id="tickChartContainer" style="width: 100%; height: 600px"></div>
+            <div id="candleChartContainer" style="width: 100%; height: 600px; display: none"></div>
+        </div>
+
+        <!-- Trade Dashboard (Real-time) -->
+        <div id="tradeDashboard" style="
+                    display: none;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 8px;
+                    margin-bottom: 20px;
+                    padding: 12px;
+                    background: #252526;
+                    border: 1px solid #3c3c3c;
+                    border-radius: 6px;
+                    font-family: &quot;Segoe UI&quot;, monospace;
+                    font-size: 13px;
+                ">
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Current Spot</div>
+                <div id="dashSpot" style="font-size: 15px; font-weight: 600; color: #fff">
+                    --
+                </div>
+            </div>
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Safety Gap</div>
+                <div id="dashGap" style="
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #4caf50;
+                        ">
+                    --
+                </div>
+                <div id="dashGapPct" style="font-size: 11px; color: #aaa">
+                    (--%)
+                </div>
+            </div>
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Velocity</div>
+                <div id="dashVel" style="font-size: 15px; font-weight: 600">
+                    --
+                </div>
+            </div>
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Profit</div>
+                <div id="dashProfit" style="font-size: 15px; font-weight: 600">
+                    --
+                </div>
+            </div>
+
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Balance (Est.)</div>
+                <div id="dashBalance" style="font-size: 15px; font-weight: 600; color: #fff">
+                    --
+                </div>
+            </div>
+
+            <div class="dash-item">
+                <div style="color: #888; font-size: 11px">Lot No (Today)</div>
+                <div id="dashLotNo" style="font-size: 14px; font-weight: 600; color: #ccc">
+                    --
+                </div>
+            </div>
+
+            <div class="dash-item" style="grid-column: span 3; margin-top: 5px">
+                <div id="dashStatus" style="
+                            background: #333;
+                            color: #aaa;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            text-align: center;
+                            font-weight: bold;
+                            letter-spacing: 1px;
+                        ">
+                    WAITING FOR TRADE...
+                </div>
+                <div id="dashAction" style="
+                    margin-top: 5px; 
+                    font-size: 12px; 
+                    text-align: center; 
+                    color: #bbb; 
+                    font-style: italic;">
+                    (bot is idle)
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Settings -->
+        <div style="
+                    margin-bottom: 15px;
+                    padding: 15px;
+                    background: #252526;
+                    border: 1px solid #3c3c3c;
+                    border-radius: 6px;
+                ">
+            <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                        flex-wrap: wrap;
+                    ">
+                <div style="flex: 0 0 auto">
+                    <label style="
+                                margin-bottom: 5px;
+                                display: block;
+                                font-size: 13px;
+                            ">
+                        ⚙️ Candle Interval (seconds)
+                    </label>
+                    <input type="number" id="candleInterval" value="10" min="1" max="300" step="1"
+                        style="width: 100px; padding: 8px" onchange="updateCandleInterval()" />
+                </div>
+                <div style="flex: 0 0 auto; padding-top: 20px">
+                    <button onclick="updateCandleInterval()" style="
+                                background-color: #4ec9b0;
+                                color: #1e1e1e;
+                                border: none;
+                                padding: 8px 15px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-weight: 500;
+                            ">
+                        Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tick Data Display -->
+        <div style="
+                    margin-bottom: 15px;
+                    padding: 15px;
+                    background: #252526;
+                    border: 1px solid #3c3c3c;
+                    border-radius: 6px;
+                ">
+            <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 10px;
+                    ">
+                <label style="
+                            margin: 0;
+                            font-size: 14px;
+                            color: #4ec9b0;
+                            font-weight: 600;
+                        ">
+                    📊 Tick Data Storage (Last 100 ticks)
+                </label>
+                <div style="display: flex; gap: 8px">
+                    <button onclick="exportTickData()" style="
+                                background-color: #4ec9b0;
+                                color: #1e1e1e;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                font-weight: 500;
+                            ">
+                        📥 Export
+                    </button>
+                    <button onclick="importTickData()" style="
+                                background-color: #569cd6;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                font-weight: 500;
+                            ">
+                        📤 Import
+                    </button>
+                    <button onclick="clearTickData()" style="
+                                background-color: #d32f2f;
+                                color: white;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">
+                        🗑️ Clear Data
+                    </button>
+                </div>
+            </div>
+            <textarea id="tickDataArea" readonly style="
+                        width: 100%;
+                        height: 150px;
+                        background-color: #1e1e1e;
+                        color: #d4d4d4;
+                        border: 1px solid #555;
+                        border-radius: 4px;
+                        padding: 10px;
+                        font-family:
+                            &quot;Consolas&quot;, &quot;Courier New&quot;,
+                            monospace;
+                        font-size: 12px;
+                        resize: vertical;
+                        box-sizing: border-box;
+                    ">
+No tick data yet...</textarea>
+        </div>
+
+        <!-- Bot Configuration -->
+        <div id="configSection" style="display: none; opacity: 0.5; pointer-events: none">
+            <div class="section-title">Bot Configuration</div>
+
+            <div class="form-section">
+                <!-- Asset -->
+                <div class="form-group full-width">
+                    <label for="assetSelect">Underlying Asset</label>
+                    <select id="assetSelect"></select>
+                </div>
+
+                <!-- Growth Rate -->
+                <div class="form-group full-width">
+                    <label>Growth Rate</label>
+                    <div class="growth-options" id="growthOptions">
+                        <div class="growth-option" data-value="0.01">1%</div>
+                        <div class="growth-option" data-value="0.02">2%</div>
+                        <div class="growth-option" data-value="0.03">3%</div>
+                        <div class="growth-option" data-value="0.04">4%</div>
+                        <div class="growth-option" data-value="0.05">5%</div>
+                    </div>
+                    <input type="hidden" id="growthRate" value="" />
+                </div>
+
+                <!-- Stake & TP -->
+                <div class="form-group">
+                    <label>Stake (USD)</label>
+                    <input type="number" id="stakeAmount" value="10" min="1" step="0.1" />
+                </div>
+                <div class="form-group">
+                    <label>Take Profit (USD)</label>
+                    <input type="number" id="takeProfit" value="0.1" min="0.1" step="0.1" />
+                </div>
+
+                <!-- Loop Config -->
+                <div class="form-group">
+                    <label>Loop Count (N)</label>
+                    <input type="number" id="loopCount" value="15" min="1" />
+                </div>
+                <div class="form-group">
+                    <label>Delay (Seconds)</label>
+                    <input type="number" id="loopDelay" value="3" min="1" />
+                </div>
+
+                <!-- SAFETY FIRST: Risk Management -->
+                <div class="full-width section-title" style="
+                            margin-top: 10px;
+                            background: #f44336;
+                            color: white;
+                            padding: 8px;
+                        ">
+                    🛡️ RISK MANAGEMENT (SAFETY FIRST)
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        Max Daily Loss (USD) 
+                        <span class="warning-badge">⚠️ DISABLED</span>
+                    </label>
+                    <input type="number" id="maxDailyLoss" value="50" min="10" step="10" class="input-warning" />
+                    <div style="font-size: 11px; color: #ff9900; margin-top: 4px;">
+                        ⚠️ ฟีเจอร์นี้ถูกปิดใช้งาน - Bot จะเทรดต่อเนื่องโดยไม่สนใจ Daily Loss Limit
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Max Session Loss (USD)
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            หยุด Lot นี้เมื่อขาดทุนถึงจำนวนนี้
+                        </div>
+                    </label>
+                    <input type="number" id="maxSessionLoss" value="20" min="5" step="5" />
+                </div>
+
+                <div class="form-group">
+                    <label>Max Consecutive Losses
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            หยุดเมื่อแพ้ติดกันจำนวนนี้
+                        </div>
+                    </label>
+                    <input type="number" id="maxConsecLoss" value="5" min="2" step="1" />
+                </div>
+
+                <div class="form-group">
+                    <label>Reduce Stake on Loss (%)
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            ลด Stake เมื่อแพ้ (0 = ไม่ลด, 50 = ลด 50%)
+                        </div>
+                    </label>
+                    <input type="number" id="reducePct" value="30" min="0" max="90" step="10" />
+                </div>
+
+                <div class="form-group">
+                    <label>Min Stake After Reduce (USD)
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            Stake ต่ำสุดหลังลดแล้ว
+                        </div>
+                    </label>
+                    <input type="number" id="minStake" value="1" min="0.5" step="0.5" />
+                </div>
+
+                <!-- Panic Sell Config -->
+                <div class="full-width section-title" style="margin-top: 10px">
+                    Loss Protection (Panic Sell)
+                </div>
+                <div class="form-group">
+                    <label>Min Gap % (Panic Level)
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            ถ้าระยะห่างเหลือต่ำกว่าค่านี้ (% ของตอนเริ่ม) ให้ขายทิ้ง
+                        </div>
+                    </label>
+                    <input type="number" id="panicPct" value="40" min="1" max="100" />
+                </div>
+                <div class="form-group">
+                    <label>Max Velocity % (Crash Detect)
+                        <div style="font-size: 11px; color: #999; font-weight: normal; margin-top: 2px;">
+                            ถ้ากราฟพุ่งเข้าหา Barrier เร็วเกินค่านี้ (% ใน 1 Tick) ให้ขายทิ้ง
+                        </div>
+                    </label>
+                    <input type="number" id="velocityPct" value="30" min="1" max="100" />
+                </div>
+
+                <!-- Chart Indicators (Tick Chart Only) -->
+                <div class="full-width section-title" style="margin-top: 10px">
+                    Chart Indicators (Tick Only)
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="indicatorType">
+                        <option value="HMA" selected>HMA (Hull - Faster)</option>
+                        <option value="EMA">EMA (Exponential - Smooth)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Period</label>
+                    <input type="number" id="indicatorPeriod" value="14" min="2" max="200" />
+                </div>
+            </div>
+
+            <button class="primary" id="btnStart" onclick="startBot()">
+                ▶ Start Bot (New Lot)
+            </button>
+            <button class="stop" id="btnStop" onclick="stopBot()">
+                ⏹ Stop Bot
+            </button>
+        </div>
+
+        <div id="status"></div>
+
+        <!-- Audio -->
+        <audio id="applauseSound" src="applause.mp3"></audio>
+
+        <!-- Tabs -->
+        <div class="tabs" id="mainTabs">
+            <button class="tab-btn active" onclick="switchTab('session')">
+                Session Report
+            </button>
+            <button class="tab-btn" onclick="switchTab('headTrade')">
+                HeadTrade Info
+            </button>
+        </div>
+
+        <!-- Tab Content: Session Report -->
+        <div id="tab-session" class="tab-content active">
+            <div class="summary-stats">
+                <div class="summary-item">
+                    Loop: <strong id="sumTotal">0</strong>
+                </div>
+                <div class="summary-item" style="color: #4caf50">
+                    Win: <strong id="sumWin">0</strong>
+                </div>
+                <div class="summary-item" style="color: #f44336">
+                    Loss: <strong id="sumLoss">0</strong>
+                </div>
+                <div class="summary-item">
+                    Lot Profit: <strong id="sumPnl">0.00</strong>
+                </div>
+            </div>
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Time</th>
+                        <th>Asset</th>
+                        <th>Result</th>
+                        <th>Profit</th>
+                        <th>Balance (Lot)</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Tab Content: HeadTrade -->
+        <div id="tab-headTrade" class="tab-content">
+            <div style="text-align: right; margin-bottom: 10px">
+                <button onclick="clearHistory()" style="
+                            background-color: #d32f2f;
+                            color: white;
+                            width: auto;
+                            padding: 8px 15px;
+                            font-size: 12px;
+                        ">
+                    🗑️ Clear Today's History
+                </button>
+            </div>
+            <div id="headTradeDisplay">
+                <p>Waiting for trade data...</p>
+            </div>
+            <div class="section-title" style="margin-top: 20px">
+                DetailTrade (JSON)
+            </div>
+            <pre id="detailTradeJson"></pre>
+        </div>
+    </div>
+
+    <script>
+        // =============== 🔧 GLOBAL STATE & FIXED VERSION ===============
+        // แก้ไขปัญหา OpenPositionLimitExceeded, Hardcoded Token, ฟังก์ชันซ้ำ, Dashboard ภาษาไทย
+
+        // ---------- Global Variables ----------
+        let api = null;
+        let isAuthorized = false;
+        let isBotRunning = false;
+        let currentLoop = 0;
+        let totalLoops = 0;
+        let delaySeconds = 0;
+        let currentContractId = null;          // ✅ เก็บ Contract ID ปัจจุบัน (ป้องกันเปิดซ้อน)
+
+        // Risk Management
+        let riskConfig = {
+            maxDailyLoss: 50,
+            maxSessionLoss: 20,
+            maxConsecLoss: 5,
+            reducePct: 30,
+            minStake: 1,
+        };
+        let consecutiveLosses = 0;
+        let baseStake = 10;
+        let currentStake = 10;
+
+        // Chart
+        let tickChart = null;
+        let candleChart = null;
+        let lineSeries = null;
+        let indicatorSeries = null;
+        let candleSeries = null;
+        let highBarrierLine = null;
+        let lowBarrierLine = null;
+        let entryPriceLine = null;
+        let candleHighBarrierLine = null;
+        let candleLowBarrierLine = null;
+
+        // Trade tracking
+        let currentTradeBarriers = { high: null, low: null, contractId: null, entrySpot: null };
+        let currentTradeProfit = 0;
+        let tickSubscriptionId = null;
+        let currentSymbol = "R_100";
+
+        // Data buffers
+        let tickDataBuffer = [];          // สำหรับ indicator
+        let appData = {
+            currentLotNo: 0,
+            dailyBalance: 0,
+            totalTradesToday: 0,
+        };
+        let currentHeadTrade = {};
+        let currentDetailTrade = [];
+        let sessionStats = { wins: 0, losses: 0, pnl: 0 };
+
+        // Synthetic candle
+        let currentCandle = null;
+        let CANDLE_PERIOD = 10;
+
+        // Tick storage
+        let tickDataStorage = [];
+        const MAX_TICK_STORAGE = 10000;
+        let lossTradesData = [];
+
+        // ---------- Day & LocalStorage ----------
+        function checkNewDay() {
+            const today = new Date().toLocaleDateString("th-TH");
+            const storedDate = localStorage.getItem("derivBot_date");
+            if (storedDate !== today) {
+                localStorage.setItem("derivBot_date", today);
+                localStorage.setItem("derivBot_lotNo", "0");
+                localStorage.setItem("derivBot_dailyBalance", "0");
+                localStorage.setItem("derivBot_totalTrades", "0");
+                console.log("New Day detected. Resetting LotNo and Balance.");
+            }
+        }
+
+        function loadAppData() {
+            appData.currentLotNo = parseInt(localStorage.getItem("derivBot_lotNo") || "0");
+            appData.dailyBalance = parseFloat(localStorage.getItem("derivBot_dailyBalance") || "0");
+            appData.totalTradesToday = parseInt(localStorage.getItem("derivBot_totalTrades") || "0");
+        }
+
+        function saveAppData() {
+            localStorage.setItem("derivBot_lotNo", appData.currentLotNo);
+            localStorage.setItem("derivBot_dailyBalance", appData.dailyBalance.toString());
+            localStorage.setItem("derivBot_totalTrades", appData.totalTradesToday);
+        }
+
+        // ---------- Asset List ----------
+        async function populateAssetSelect(derivApiInstance = null) {
+            const assetSelect = document.getElementById("assetSelect");
+            assetSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+            try {
+                let activeSymbols = [];
+                if (derivApiInstance) {
+                    activeSymbols = await derivApiInstance.getActiveSymbols();
+                } else {
+                    const tempApi = new DerivAPI("1089");
+                    await tempApi.connect();
+                    activeSymbols = await tempApi.getActiveSymbols();
+                    tempApi.disconnect();
+                }
+                const volatilityIndices = activeSymbols
+                    .filter((s) => (s.market === "synthetic_index" && s.submarket === "random_index") || s.submarket === "random_index")
+                    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+                assetSelect.innerHTML = "";
+                volatilityIndices.forEach((asset) => {
+                    const option = document.createElement("option");
+                    option.value = asset.symbol;
+                    option.textContent = `${asset.symbol} - ${asset.display_name}`;
+                    assetSelect.appendChild(option);
+                });
+                if (volatilityIndices.some((a) => a.symbol === "R_100")) assetSelect.value = "R_100";
+            } catch (e) {
+                console.warn("Asset fetch failed", e);
+                assetSelect.innerHTML = '<option value="R_100">Volatility 100 (1s)</option>';
+            }
+        }
+
+        // ---------- Connect & Authorize ----------
+        async function connectAndAuthorize() {
+            const token = document.getElementById("apiToken").value.trim();
+            if (!token) return showStatus("❌ กรุณาใส่ API Token", "error");
+            try {
+                if (api) api.disconnect();
+                api = new DerivAPI("1089");
+                await api.connect();
+                const authResp = await api.sendAndWait({ authorize: token });
+                if (authResp.error) throw new Error(authResp.error.message);
+
+                isAuthorized = true;
+                showStatus("✅ Connected. Ready to configure.", "success");
+
+                const configDiv = document.getElementById("configSection");
+                configDiv.style.display = "block";
+                configDiv.style.opacity = "1";
+                configDiv.style.pointerEvents = "auto";
+                document.getElementById("authSection").style.display = "none";
+
+                initChart();
+                await populateAssetSelect(api);
+
+                // OHLC Listener
+                api.on("ohlc", (data) => {
+                    if (data.ohlc && data.ohlc.id === tickSubscriptionId) {
+                        const newCandle = {
+                            time: data.ohlc.epoch,
+                            open: data.ohlc.open,
+                            high: data.ohlc.high,
+                            low: data.ohlc.low,
+                            close: data.ohlc.close,
+                        };
+                        if (candleSeries) candleSeries.update(newCandle);
+                        const tick = {
+                            time: parseInt(data.ohlc.epoch),
+                            value: parseFloat(data.ohlc.close),
+                            epoch: parseInt(data.ohlc.epoch),
+                            profit: currentTradeProfit,
+                        };
+                        if (lineSeries) lineSeries.update(tick);
+                        saveTickDataToStorage(tick);
+                        tickDataBuffer.push(tick);
+                        if (tickDataBuffer.length > 2000) tickDataBuffer.shift();
+                        updateIndicatorChart();
+                    }
+                });
+
+                // Tick Listener (fallback)
+                api.on("tick", (data) => {
+                    if (data.tick && data.tick.id === tickSubscriptionId) {
+                        const tick = {
+                            time: parseInt(data.tick.epoch),
+                            value: parseFloat(data.tick.quote),
+                            epoch: parseInt(data.tick.epoch),
+                        };
+                        saveTickDataToStorage(tick);
+                        if (lineSeries) lineSeries.update(tick);
+                        if (candleSeries) updateSyntheticCandleLive(tick);
+                        tickDataBuffer.push(tick);
+                        if (tickDataBuffer.length > 2000) tickDataBuffer.shift();
+                        updateIndicatorChart();
+                    }
+                });
+
+                subscribeTicks(document.getElementById("assetSelect").value || "R_100");
+            } catch (e) {
+                showStatus(`❌ Auth Failed: ${e.message}`, "error");
+            }
+        }
+
+        // ---------- Chart Initialization ----------
+        function initChart() {
+            const tickContainer = document.getElementById("tickChartContainer");
+            tickChart = LightweightCharts.createChart(tickContainer, {
+                width: tickContainer.offsetWidth,
+                height: window.innerHeight - 200,
+                layout: { background: { type: "solid", color: "#1e1e1e" }, textColor: "#d1d4f9" },
+                grid: { vertLines: { color: "rgba(42, 46, 57, 0.5)" }, horzLines: { color: "rgba(42, 46, 57, 0.5)" } },
+                timeScale: { timeVisible: true, secondsVisible: true, barSpacing: 8, rightOffset: 12, minBarSpacing: 3 },
+                rightPriceScale: { autoScale: true, scaleMargins: { top: 0.1, bottom: 0.1 } },
+            });
+            lineSeries = tickChart.addLineSeries({ color: "#4ec9b0", lineWidth: 2 });
+            indicatorSeries = tickChart.addLineSeries({ color: "#ff9800", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid });
+
+            const candleContainer = document.getElementById("candleChartContainer");
+            candleChart = LightweightCharts.createChart(candleContainer, {
+                width: candleContainer.offsetWidth,
+                height: window.innerHeight - 200,
+                layout: { background: { type: "solid", color: "#1e1e1e" }, textColor: "#d1d4f9" },
+                grid: { vertLines: { color: "rgba(42, 46, 57, 0.5)" }, horzLines: { color: "rgba(42, 46, 57, 0.5)" } },
+                timeScale: { timeVisible: true, secondsVisible: true, barSpacing: 50, rightOffset: 12, minBarSpacing: 15 },
+                rightPriceScale: { autoScale: true, scaleMargins: { top: 0.1, bottom: 0.1 } },
+            });
+            candleSeries = candleChart.addCandlestickSeries({
+                upColor: "#26a69a", downColor: "#ef5350", borderVisible: true,
+                borderUpColor: "#26a69a", borderDownColor: "#ef5350",
+                wickUpColor: "#26a69a", wickDownColor: "#ef5350", wickVisible: true,
+            });
+
+            const resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    if (entry.target.id === "tickChartContainer" && tickChart) {
+                        tickChart.applyOptions({ width: entry.contentRect.width });
+                    } else if (entry.target.id === "candleChartContainer" && candleChart) {
+                        if (entry.contentRect.width > 0) candleChart.applyOptions({ width: entry.contentRect.width });
+                    }
+                }
+            });
+            resizeObserver.observe(document.getElementById("tickChartContainer"));
+            resizeObserver.observe(document.getElementById("candleChartContainer"));
+        }
+
+        // ---------- Chart Tab Switching ----------
+        function switchChartTab(tab) {
+            const tickC = document.getElementById("tickChartContainer");
+            const candC = document.getElementById("candleChartContainer");
+            const tabs = document.querySelectorAll(".tabs button");
+            if (tab === "tick") {
+                tickC.style.display = "block";
+                candC.style.display = "none";
+                tabs[0].classList.add("active");
+                tabs[1].classList.remove("active");
+                if (tickChart) tickChart.timeScale().fitContent();
+            } else {
+                tickC.style.display = "none";
+                candC.style.display = "block";
+                tabs[0].classList.remove("active");
+                tabs[1].classList.add("active");
+                if (candleChart) candleChart.timeScale().fitContent();
+            }
+        }
+
+        // ---------- Subscribe Ticks ----------
+        async function subscribeTicks(symbol) {
+            if (!api || !isAuthorized) return;
+            if (tickSubscriptionId) {
+                api.send({ forget: tickSubscriptionId });
+                tickSubscriptionId = null;
+            }
+            currentSymbol = symbol;
+            currentCandle = null;
+            if (lineSeries) lineSeries.setData([]);
+            if (candleSeries) candleSeries.setData([]);
+            if (indicatorSeries) indicatorSeries.setData([]);
+            tickDataBuffer = [];
+
+            try {
+                const history = await api.sendAndWait({
+                    ticks_history: symbol,
+                    count: 100,
+                    end: "latest",
+                    style: "candles",
+                    granularity: 60,
+                    adjust_start_time: 1,
+                    subscribe: 1,
+                });
+                if (history.candles) {
+                    const candles = history.candles.map((c) => ({
+                        time: c.epoch,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                    }));
+                    const ticks = candles.map((c) => ({ time: c.time, value: c.close, epoch: c.time, profit: 0 }));
+                    tickDataBuffer = ticks;
+                    ticks.forEach((tick) => saveTickDataToStorage(tick));
+                    if (lineSeries) {
+                        lineSeries.setData(ticks);
+                        tickChart.timeScale().fitContent();
+                    }
+                    if (candleSeries) {
+                        candleSeries.setData(candles);
+                        candleChart.timeScale().fitContent();
+                    }
+                    if (candles.length > 0) currentCandle = candles[candles.length - 1];
+                }
+                updateIndicatorChart();
+                if (history.subscription) tickSubscriptionId = history.subscription.id;
+            } catch (e) {
+                console.error("Chart sub failed", e);
+            }
+        }
+
+        // ---------- Indicators ----------
+        function calculateIndicatorsVector(data) {
+            const type = document.getElementById("indicatorType").value;
+            const period = parseInt(document.getElementById("indicatorPeriod").value);
+            const results = [];
+            if (type === "EMA") {
+                const k = 2 / (period + 1);
+                let ema = data[0].value;
+                for (let i = 0; i < data.length; i++) {
+                    if (i > 0) ema = (data[i].value - ema) * k + ema;
+                    results.push({ time: data[i].time, value: ema });
+                }
+            } else {
+                const getWMA = (arr, p, idx) => {
+                    if (idx < p - 1) return null;
+                    let sum = 0, wSum = 0;
+                    for (let j = 0; j < p; j++) {
+                        let weight = p - j;
+                        sum += arr[idx - j].value * weight;
+                        wSum += weight;
+                    }
+                    return sum / wSum;
+                };
+                const halfP = Math.floor(period / 2);
+                const sqrtP = Math.floor(Math.sqrt(period));
+                const rawHMAs = [];
+                for (let i = 0; i < data.length; i++) {
+                    const wmaFull = getWMA(data, period, i);
+                    const wmaHalf = getWMA(data, halfP, i);
+                    if (wmaFull !== null && wmaHalf !== null) rawHMAs.push({ value: 2 * wmaHalf - wmaFull });
+                    else rawHMAs.push(null);
+                }
+                for (let i = 0; i < data.length; i++) {
+                    if (i < period + sqrtP + 10) continue;
+                    let sum = 0, wSum = 0, missing = false;
+                    for (let j = 0; j < sqrtP; j++) {
+                        const val = rawHMAs[i - j];
+                        if (val === null || val === undefined) { missing = true; break; }
+                        const weight = sqrtP - j;
+                        sum += val.value * weight;
+                        wSum += weight;
+                    }
+                    if (!missing) results.push({ time: data[i].time, value: sum / wSum });
+                }
+            }
+            return results;
+        }
+
+        function updateIndicatorChart() {
+            if (!indicatorSeries || tickDataBuffer.length === 0) return;
+            const indicatorData = calculateIndicatorsVector(tickDataBuffer);
+            if (indicatorData.length > 0) indicatorSeries.setData(indicatorData);
+        }
+
+        // ---------- Barrier & Entry Lines ----------
+        function updateBarriers(high, low, contractId, entrySpot) {
+            currentTradeBarriers = { high: parseFloat(high), low: parseFloat(low), contractId, entrySpot };
+            if (lineSeries) {
+                if (highBarrierLine) { lineSeries.removePriceLine(highBarrierLine); highBarrierLine = null; }
+                if (lowBarrierLine) { lineSeries.removePriceLine(lowBarrierLine); lowBarrierLine = null; }
+                if (high) highBarrierLine = lineSeries.createPriceLine({ price: parseFloat(high), color: "#ef5350", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "High Barrier" });
+                if (low) lowBarrierLine = lineSeries.createPriceLine({ price: parseFloat(low), color: "#66bb6a", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Low Barrier" });
+            }
+            if (candleSeries) {
+                if (candleHighBarrierLine) { candleSeries.removePriceLine(candleHighBarrierLine); candleHighBarrierLine = null; }
+                if (candleLowBarrierLine) { candleSeries.removePriceLine(candleLowBarrierLine); candleLowBarrierLine = null; }
+                if (high) candleHighBarrierLine = candleSeries.createPriceLine({ price: parseFloat(high), color: "#ef5350", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "High Barrier" });
+                if (low) candleLowBarrierLine = candleSeries.createPriceLine({ price: parseFloat(low), color: "#66bb6a", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: "Low Barrier" });
+            }
+        }
+
+        function updateEntryLine(price) {
+            if (!lineSeries) return;
+            if (entryPriceLine) { lineSeries.removePriceLine(entryPriceLine); entryPriceLine = null; }
+            if (price !== null) entryPriceLine = lineSeries.createPriceLine({ price: parseFloat(price), color: "#888888", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, axisLabelVisible: true, title: "Entry" });
+        }
+
+        function updateChartDangerLevel(currentGap, maxGap) {
+            if (!tickChart || !currentGap || !maxGap) return;
+            const ratio = Math.max(0, Math.min(1, currentGap / maxGap));
+            let color = "#1e1e1e";
+            if (ratio < 0.2) {
+                const intensity = Math.floor((1 - ratio / 0.2) * 50);
+                color = `rgba(${30 + intensity}, 30, 30, 1)`;
+            } else if (ratio < 0.5) {
+                const intensity = Math.floor((1 - (ratio - 0.2) / 0.3) * 30);
+                color = `rgba(${30 + intensity}, ${30 + intensity}, 30, 1)`;
+            }
+            tickChart.applyOptions({ layout: { background: { type: "solid", color } } });
+        }
+
+        // ---------- Trade Dashboard (THAI Version with dashAction) ----------
+        function updateTradeDashboard(data) {
+            const dashSpot = document.getElementById("dashSpot");
+            const dashGap = document.getElementById("dashGap");
+            const dashGapPct = document.getElementById("dashGapPct");
+            const dashVel = document.getElementById("dashVel");
+            const dashProfit = document.getElementById("dashProfit");
+            const dashStatus = document.getElementById("dashStatus");
+            const dashBalance = document.getElementById("dashBalance");
+            const dashLot = document.getElementById("dashLotNo");
+            const dashAction = document.getElementById("dashAction");
+
+            if (!data) {
+                dashSpot.innerText = "--";
+                dashGap.innerText = "--";
+                dashGapPct.innerText = "(--%)";
+                dashVel.innerText = "--";
+                dashProfit.innerText = "--";
+                dashStatus.innerText = "WAITING FOR TRADE...";
+                dashStatus.style.background = "#333";
+                dashStatus.style.color = "#aaa";
+                dashAction.innerText = "(bot is idle)";
+                if (dashBalance) dashBalance.innerText = "--";
+                if (dashLot) dashLot.innerText = "--";
+                return;
+            }
+
+            dashSpot.innerText = data.spot.toFixed(3);
+            dashProfit.innerText = (data.profit > 0 ? "+" : "") + data.profit.toFixed(2) + " USD";
+            dashProfit.style.color = data.profit >= 0 ? "#4caf50" : "#ef5350";
+
+            const gapPct = data.initialGap > 0 ? (data.gap / data.initialGap) * 100 : 0;
+            dashGap.innerText = data.gap.toFixed(4);
+            dashGapPct.innerText = `(${gapPct.toFixed(1)}%)`;
+            if (data.gap < data.panicT) dashGap.style.color = "#ef5350";
+            else if (data.gap < data.panicT * 1.5) dashGap.style.color = "#ff9800";
+            else dashGap.style.color = "#4caf50";
+
+            dashVel.innerText = data.velocity.toFixed(4);
+            if (data.velocity > data.velocityT) dashVel.style.color = "#ef5350";
+            else if (data.velocity > data.velocityT * 0.5) dashVel.style.color = "#ff9800";
+            else dashVel.style.color = "#ccc";
+
+            // Balance ใช้ appData.dailyBalance
+            if (dashBalance) dashBalance.innerText = (appData.dailyBalance || 0).toFixed(2) + " USD";
+            if (dashLot) dashLot.innerText = appData.totalTradesToday + 1;
+
+            // สถานะและคำแนะนำภาษาไทย
+            if (data.gap < data.panicT) {
+                dashStatus.innerText = "🚨 หนีตายด่วน! (GAP อันตรายเกินไป)";
+                dashStatus.style.background = "#ef5350";
+                dashStatus.style.color = "#fff";
+                dashAction.innerText = "⚠️ ระบบกำลังสั่งขายทันที! เพื่อรักษาทุน";
+                dashAction.style.color = "#ffeb3b";
+            } else if (data.velocity > data.velocityT) {
+                dashStatus.innerText = "🚨 หนีตายด่วน! (ราคาวิ่งลงเร็วผิดปกติ)";
+                dashStatus.style.background = "#ef5350";
+                dashStatus.style.color = "#fff";
+                dashAction.innerText = "⚠️ ระบบกำลังสั่งขายทันที! ป้องกันการกระชากลง";
+                dashAction.style.color = "#ffeb3b";
+            } else if (data.gap < data.panicT * 1.5) {
+                dashStatus.innerText = "⚠️ ระวัง! GAP เริ่มต่ำ (เสี่ยงชน)";
+                dashStatus.style.background = "#ff9800";
+                dashStatus.style.color = "#000";
+                dashAction.innerText = "👀 จับตาดูใกล้ชิด ถ้าร่วงอีกนิดจะขายทิ้ง";
+                dashAction.style.color = "#ff9800";
+            } else if (data.velocity > data.velocityT * 0.5) {
+                dashStatus.innerText = "⚠️ ระวัง! กราฟเริ่มผันผวน";
+                dashStatus.style.background = "#ff9800";
+                dashStatus.style.color = "#000";
+                dashAction.innerText = "👀 ราคาวิ่งเร็วขึ้น เตรียมตัวหนีถ้าจำเป็น";
+                dashAction.style.color = "#ff9800";
+            } else {
+                dashStatus.innerText = "✅ สถานะปลอดภัย (ถือต่อได้)";
+                dashStatus.style.background = "#2e7d32";
+                dashStatus.style.color = "#fff";
+                dashAction.innerText = "⏳ รอทำกำไรตามเป้าหมาย...";
+                dashAction.style.color = "#81c784";
+            }
+        }
+
+        // ---------- Synthetic Candles ----------
+        function updateCandleInterval() {
+            const input = document.getElementById("candleInterval");
+            const newInterval = parseInt(input.value) || 10;
+            CANDLE_PERIOD = newInterval;
+            document.getElementById("candleTabBtn").textContent = `Candles (${newInterval}s)`;
+            if (tickDataBuffer.length > 0) {
+                const candles = generateSyntheticCandles(tickDataBuffer);
+                if (candleSeries) {
+                    candleSeries.setData(candles);
+                    candleChart.timeScale().fitContent();
+                }
+                currentCandle = candles.length > 0 ? candles[candles.length - 1] : null;
+            }
+        }
+
+        function generateSyntheticCandles(ticks) {
+            const candles = [];
+            let candle = null;
+            if (!ticks || ticks.length === 0) return [];
+            for (const t of ticks) {
+                const timeSlot = Math.floor(t.time / CANDLE_PERIOD) * CANDLE_PERIOD;
+                if (candle && candle.time === timeSlot) {
+                    candle.high = Math.max(candle.high, t.value);
+                    candle.low = Math.min(candle.low, t.value);
+                    candle.close = t.value;
+                } else {
+                    if (candle) candles.push(candle);
+                    candle = { time: timeSlot, open: t.value, high: t.value, low: t.value, close: t.value };
+                }
+            }
+            if (candle) candles.push(candle);
+            return candles;
+        }
+
+        function updateSyntheticCandleLive(tick) {
+            const timeSlot = Math.floor(tick.time / CANDLE_PERIOD) * CANDLE_PERIOD;
+            if (currentCandle && currentCandle.time === timeSlot) {
+                currentCandle.high = Math.max(currentCandle.high, tick.value);
+                currentCandle.low = Math.min(currentCandle.low, tick.value);
+                currentCandle.close = tick.value;
+                candleSeries.update(currentCandle);
+            } else {
+                currentCandle = { time: timeSlot, open: tick.value, high: tick.value, low: tick.value, close: tick.value };
+                candleSeries.update(currentCandle);
+            }
+        }
+
+        // ---------- Tick Data Storage ----------
+        function saveTickDataToStorage(tick) {
+            tickDataStorage.push({
+                time: tick.time,
+                value: tick.value,
+                epoch: tick.epoch,
+                profit: tick.profit || 0,
+                timestamp: new Date(tick.time * 1000).toLocaleString("th-TH"),
+            });
+            if (tickDataStorage.length > MAX_TICK_STORAGE) tickDataStorage = tickDataStorage.slice(-MAX_TICK_STORAGE);
+            try {
+                localStorage.setItem("tickData", JSON.stringify(tickDataStorage));
+                localStorage.setItem("lossTradesData", JSON.stringify(lossTradesData));
+            } catch (e) { console.warn("Failed to save data to localStorage:", e); }
+            updateTickDataDisplay();
+        }
+
+        function loadTickDataFromStorage() {
+            try {
+                const stored = localStorage.getItem("tickData");
+                if (stored) { tickDataStorage = JSON.parse(stored); updateTickDataDisplay(); }
+                const storedLoss = localStorage.getItem("lossTradesData");
+                if (storedLoss) { lossTradesData = JSON.parse(storedLoss); }
+            } catch (e) { console.warn("Failed to load data from localStorage:", e); tickDataStorage = []; lossTradesData = []; }
+        }
+
+        function updateTickDataDisplay() {
+            const textarea = document.getElementById("tickDataArea");
+            if (!textarea) return;
+            if (tickDataStorage.length === 0) { textarea.value = "No data yet..."; return; }
+            const recentTicks = tickDataStorage.slice(-100).reverse();
+            const lines = recentTicks.map((tick) => {
+                let line = `${tick.timestamp} | Close: ${parseFloat(tick.value).toFixed(4)}`;
+                if (tick.profit !== undefined) line += ` | Profit: ${tick.profit >= 0 ? "+" : ""}${Number(tick.profit).toFixed(2)}`;
+                return line;
+            });
+            let lossSection = "";
+            if (lossTradesData.length > 0) {
+                lossSection = `\n\n${"=".repeat(80)}\n💥 LOSS TRADES DETECTED (${lossTradesData.length})\n${"=".repeat(80)}\n\n`;
+                lossTradesData.slice(-20).reverse().forEach((loss, idx) => {
+                    lossSection += `${idx + 1}. ${loss.timestamp}\n   Spot: ${loss.spot} | Hit ${loss.hitBarrier} Barrier @ ${loss.barrierPrice}\n   Loss: $${loss.profit}\n\n`;
+                });
+            }
+            textarea.value = `📊 OHLC Subscription Active (60s Candles)\nTotal Data Points: ${tickDataStorage.length}\nShowing Last ${recentTicks.length} Close Prices:\n${"=".repeat(80)}\n\n${lines.join("\n")}${lossSection}`;
+            textarea.scrollTop = 0;
+        }
+
+        function clearTickData() {
+            if (confirm("Clear all stored tick data and loss markers?")) {
+                tickDataStorage = [];
+                lossTradesData = [];
+                localStorage.removeItem("tickData");
+                localStorage.removeItem("lossTradesData");
+                if (candleSeries) candleSeries.setMarkers([]);
+                updateTickDataDisplay();
+            }
+        }
+
+        function exportTickData() {
+            if (tickDataStorage.length === 0) { alert("No tick data to export!"); return; }
+            const dataStr = JSON.stringify(tickDataStorage, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `tick-data-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importTickData() {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".json";
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (!Array.isArray(importedData)) { alert("Invalid data format!"); return; }
+                        const isValid = importedData.every(tick => tick.time && tick.value && tick.epoch && tick.timestamp);
+                        if (!isValid) { alert("Invalid tick data structure! Expected: {time, value, epoch, timestamp}"); return; }
+                        const action = confirm(`Import ${importedData.length} ticks.\n\nClick OK to MERGE with existing data.\nClick Cancel to REPLACE existing data.`);
+                        if (action) tickDataStorage = [...tickDataStorage, ...importedData];
+                        else tickDataStorage = importedData;
+                        if (tickDataStorage.length > MAX_TICK_STORAGE) tickDataStorage = tickDataStorage.slice(-MAX_TICK_STORAGE);
+                        localStorage.setItem("tickData", JSON.stringify(tickDataStorage));
+                        updateTickDataDisplay();
+                    } catch (error) { alert("Failed to parse JSON file: " + error.message); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // ---------- Bot Control ----------
+        function startBot() {
+            if (!isAuthorized) return;
+            checkNewDay();
+            loadAppData();
+
+            riskConfig.maxDailyLoss = parseFloat(document.getElementById("maxDailyLoss").value) || 50;
+            riskConfig.maxSessionLoss = parseFloat(document.getElementById("maxSessionLoss").value) || 20;
+            riskConfig.maxConsecLoss = parseInt(document.getElementById("maxConsecLoss").value) || 5;
+            riskConfig.reducePct = parseFloat(document.getElementById("reducePct").value) || 30;
+            riskConfig.minStake = parseFloat(document.getElementById("minStake").value) || 1;
+
+            // Daily Loss Limit DISABLED (แจ้งเตือนใน UI แล้ว)
+
+            appData.currentLotNo++;
+            saveAppData();
+
+            totalLoops = parseInt(document.getElementById("loopCount").value);
+            delaySeconds = parseInt(document.getElementById("loopDelay").value);
+            currentLoop = 0;
+            isBotRunning = true;
+            sessionStats = { wins: 0, losses: 0, pnl: 0 };
+            currentDetailTrade = [];
+            consecutiveLosses = 0;
+
+            baseStake = parseFloat(document.getElementById("stakeAmount").value) || 10;
+            currentStake = baseStake;
+
+            currentHeadTrade = {
+                CurrentLotNo: appData.currentLotNo,
+                TotalTrade: appData.currentLotNo,
+                StartTrade: new Date().toLocaleString("th-TH"),
+                EndTrade: null,
+                BalanceOfDay: appData.dailyBalance,
+                LastTrade: null,
+                LastProfit: 0,
+            };
+
+            document.querySelector("#logTable tbody").innerHTML = "";
+            updateStatsUI();
+            updateHeadTradeUI();
+
+            document.getElementById("mainTabs").style.display = "flex";
+            document.getElementById("tab-session").style.display = "block";
+            document.getElementById("btnStart").style.display = "none";
+            document.getElementById("btnStop").style.display = "block";
+            document.getElementById("tradeDashboard").style.display = "grid";
+
+            saveSessionToLocalStorage();
+            showStatus(`🚀 Bot Started. Lot No: ${appData.currentLotNo}. Target: ${totalLoops} rounds.`, "info");
+            processNextTrade();
+        }
+
+        async function stopBot() {
+            isBotRunning = false;
+            // ✅ ขายสัญญาที่ค้างอยู่ทันที
+            if (currentContractId) {
+                try {
+                    await api.sendAndWait({ sell: currentContractId, price: 0 });
+                    console.log(`🛑 Forced sell of contract ${currentContractId}`);
+                } catch (e) {
+                    console.warn("Force sell failed", e);
+                }
+                currentContractId = null;
+            }
+            showStatus("⏹ Bot Stopped by user.", "status-info");
+            document.getElementById("btnStart").style.display = "block";
+            document.getElementById("btnStop").style.display = "none";
+            if (currentHeadTrade) {
+                currentHeadTrade.EndTrade = new Date().toLocaleString("th-TH");
+                saveSessionToLocalStorage();
+                updateHeadTradeUI();
+            }
+        }
+
+        function finishBot() {
+            isBotRunning = false;
+            if (currentContractId) {
+                api.send({ sell: currentContractId, price: 0 });
+                currentContractId = null;
+            }
+            showStatus(`🏁 Bot Finished. Total Rounds: ${currentLoop}`, "success");
+            const audio = document.getElementById("applauseSound");
+            if (audio) audio.play().catch(() => {});
+            document.getElementById("btnStart").style.display = "block";
+            document.getElementById("btnStop").style.display = "none";
+            currentHeadTrade.EndTrade = new Date().toLocaleString("th-TH");
+            saveSessionToLocalStorage();
+            updateHeadTradeUI();
+        }
+
+        function clearHistory() {
+            if (!confirm("Are you sure you want to clear ALL trade history for today? This cannot be undone.")) return;
+            localStorage.removeItem("derivBot_lotNo");
+            localStorage.removeItem("derivBot_dailyBalance");
+            localStorage.removeItem("derivBot_totalTrades");
+            Object.keys(localStorage).forEach((key) => { if (key.startsWith("derivBot_session_")) localStorage.removeItem(key); });
+            appData = { currentLotNo: 0, dailyBalance: 0, totalTradesToday: 0 };
+            currentHeadTrade = {};
+            currentDetailTrade = [];
+            sessionStats = { wins: 0, losses: 0, pnl: 0 };
+            document.querySelector("#logTable tbody").innerHTML = "";
+            document.getElementById("detailTradeJson").innerHTML = "";
+            document.getElementById("headTradeDisplay").innerHTML = "<p>History Cleared. Waiting for new trade...</p>";
+            updateStatsUI();
+            showStatus("🗑️ History Cleared.", "success");
+        }
+
+        // ---------- Trade Execution (Fixed: No more OpenPositionLimitExceeded) ----------
+        function processNextTrade() {
+            if (!isBotRunning || currentLoop >= totalLoops) { finishBot(); return; }
+            currentLoop++;
+            showStatus(`🔄 Processing Round ${currentLoop} / ${totalLoops} (Lot ${appData.currentLotNo})...`, "info");
+            try {
+                updateBarriers(null, null, null, null);
+                executeSingleTrade().then(result => logTradeResult(result)).catch(e => {
+                    console.error("Trade Error", e);
+                    logTradeResult({ result: "ERROR", profit: 0, time: new Date(), asset: "ERR", growth: 0, stake: 0, takeProfit: 0, reason: "EXCEPTION" });
+                });
+            } catch (e) {
+                console.error("Outer Trade Error", e);
+                logTradeResult({ result: "ERROR", profit: 0, time: new Date(), asset: "ERR", growth: 0, stake: 0, takeProfit: 0, reason: "EXCEPTION" });
+            }
+            if (isBotRunning && currentLoop < totalLoops) {
+                let d = delaySeconds;
+                const interval = setInterval(() => {
+                    if (!isBotRunning) { clearInterval(interval); return; }
+                    showStatus(`⏳ Waiting ${d}s for next round...`, "status-info");
+                    d--;
+                    if (d < 0) { clearInterval(interval); processNextTrade(); }
+                }, 1000);
+            } else if (currentLoop >= totalLoops) { finishBot(); }
+        }
+
+        function executeSingleTrade() {
+            return new Promise(async (resolve, reject) => {
+                // ✅ รอจนกว่าสัญญาเก่าจะปิดสนิท (ป้องกัน OpenPositionLimitExceeded)
+                while (currentContractId !== null) {
+                    console.log(`⏳ Waiting for contract ${currentContractId} to be sold...`);
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+
+                const symbol = document.getElementById("assetSelect").value || "R_100";
+                const growthRate = parseFloat(document.getElementById("growthRate").value || 0.03);
+                const stake = currentStake;
+                const targetProfit = parseFloat(document.getElementById("takeProfit").value);
+                let sellReason = "UNKNOWN";
+                let initialGap = null;
+
+                try {
+                    await new Promise(r => setTimeout(r, 2000)); // safety delay
+
+                    const propReq = { proposal: 1, amount: stake, basis: "stake", contract_type: "ACCU", currency: "USD", symbol: symbol, growth_rate: growthRate };
+                    const propResp = await api.sendAndWait(propReq);
+                    if (propResp.error) throw new Error(propResp.error.message);
+
+                    if (propResp.proposal) {
+                        const p = propResp.proposal;
+                        let high = p.high_barrier;
+                        let low = p.low_barrier;
+                        if (p.contract_details) {
+                            if (!high) high = p.contract_details.high_barrier;
+                            if (!low) low = p.contract_details.low_barrier;
+                        }
+                        if (!high && p.barrier) high = p.barrier;
+                        const entrySpot = p.spot ? parseFloat(p.spot) : null;
+                        updateBarriers(high, low, null, entrySpot);
+                        updateEntryLine(entrySpot);
+
+                        // คำนวณ initial gap
+                        if (p.contract_details && p.contract_details.barrier_spot_distance) {
+                            initialGap = parseFloat(p.contract_details.barrier_spot_distance);
+                        }
+                        if (!initialGap && p.spot) {
+                            const s = parseFloat(p.spot);
+                            let h = high, l = low;
+                            if (p.contract_details) {
+                                if (!h) h = p.contract_details.high_barrier;
+                                if (!l) l = p.contract_details.low_barrier;
+                            }
+                            if (h && l && !isNaN(s)) {
+                                const gapUp = parseFloat(h) - s;
+                                const gapDown = s - parseFloat(l);
+                                initialGap = Math.min(gapUp, gapDown);
+                            } else if (p.barrier && !isNaN(s)) {
+                                initialGap = Math.abs(parseFloat(p.barrier) - s);
+                            }
+                        }
+                    }
+
+                    const proposalId = propResp.proposal.id;
+                    const buyResp = await api.sendAndWait({ buy: proposalId, price: propResp.proposal.ask_price });
+                    if (buyResp.error) throw new Error(buyResp.error.message);
+                    const contractId = buyResp.buy.contract_id;
+                    currentContractId = contractId;   // ✅ เก็บ Contract ID ปัจจุบัน
+
+                    if (propResp.proposal) {
+                        const p = propResp.proposal;
+                        let high = p.high_barrier, low = p.low_barrier;
+                        if (p.contract_details) {
+                            if (!high) high = p.contract_details.high_barrier;
+                            if (!low) low = p.contract_details.low_barrier;
+                        }
+                        updateBarriers(high, low, contractId, parseFloat(p.spot));
+                    }
+
+                    api.send({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 });
+
+                    let prevMinGap = null;
+
+                    const monitorHandler = (data) => {
+                        const contract = data.proposal_open_contract;
+                        if (!contract || contract.contract_id !== contractId) return;
+
+                        const profit = parseFloat(contract.profit);
+                        const currentSpot = parseFloat(contract.current_spot);
+                        const highBarrier = parseFloat(contract.high_barrier);
+                        const lowBarrier = parseFloat(contract.low_barrier);
+
+                        currentTradeProfit = profit;
+
+                        if (!contract.is_sold && !isNaN(currentSpot) && !isNaN(highBarrier) && !isNaN(lowBarrier)) {
+                            const gapUp = highBarrier - currentSpot;
+                            const gapDown = currentSpot - lowBarrier;
+                            const minGap = Math.min(gapUp, gapDown);
+                            let gapVelocity = 0;
+                            if (prevMinGap !== null) gapVelocity = prevMinGap - minGap;
+
+                            const panicInput = document.getElementById("panicPct");
+                            const velocityInput = document.getElementById("velocityPct");
+                            const userPanicPct = panicInput ? parseFloat(panicInput.value) / 100 : 0.4;
+                            const userVelPct = velocityInput ? parseFloat(velocityInput.value) / 100 : 0.3;
+
+                            let panicT = 0.1, velocityT = 0.2;
+                            if (initialGap) {
+                                panicT = initialGap * userPanicPct;
+                                velocityT = initialGap * userVelPct;
+                                if (consecutiveLosses >= 2) {
+                                    const safetyMultiplier = 1 + consecutiveLosses * 0.1;
+                                    panicT = panicT * safetyMultiplier;
+                                    velocityT = velocityT * (safetyMultiplier * 0.8);
+                                }
+                            }
+
+                            if (minGap < panicT || gapVelocity > velocityT) {
+                                api.send({ sell: contractId, price: 0 });
+                            }
+
+                            updateTradeDashboard({
+                                spot: currentSpot,
+                                gap: minGap,
+                                initialGap: initialGap,
+                                velocity: gapVelocity,
+                                profit: profit,
+                                panicT: panicT,
+                                velocityT: velocityT,
+                            });
+
+                            prevMinGap = minGap;
+                            updateChartDangerLevel(minGap, initialGap);
+                        }
+
+                        if (!contract.is_sold && profit >= targetProfit) {
+                            api.send({ sell: contractId, price: 0 });
+                            sellReason = "TAKE_PROFIT";
+                        }
+
+                        if (contract.is_sold) {
+                            if (data.subscription) api.send({ forget: data.subscription.id });
+                            tickChart.applyOptions({ layout: { background: { type: "solid", color: "#1e1e1e" } } });
+                            if (candleChart) candleChart.applyOptions({ layout: { background: { type: "solid", color: "#1e3e1e" } } });
+
+                            const finalProfit = parseFloat(contract.profit);
+                            if (finalProfit < 0) sellReason = "HIT_BARRIER";
+                            else if (sellReason === "UNKNOWN" && finalProfit > 0) sellReason = "MANUAL_OR_EXPIRE";
+                            else if (sellReason === "UNKNOWN" && finalProfit === 0) sellReason = "BREAK_EVEN";
+
+                            if (finalProfit < 0) {
+                                const hitHigh = currentSpot >= highBarrier;
+                                const hitLow = currentSpot <= lowBarrier;
+                                const lossData = {
+                                    time: contract.sell_time || Math.floor(Date.now() / 1000),
+                                    spot: currentSpot,
+                                    hitBarrier: hitHigh ? "HIGH" : (hitLow ? "LOW" : "UNKNOWN"),
+                                    barrierPrice: hitHigh ? highBarrier : lowBarrier,
+                                    profit: finalProfit,
+                                    timestamp: new Date().toLocaleString('th-TH'),
+                                };
+                                lossTradesData.push(lossData);
+                                if (candleSeries) {
+                                    const markers = lossTradesData.map(loss => ({
+                                        time: loss.time,
+                                        position: loss.hitBarrier === "HIGH" ? 'aboveBar' : 'belowBar',
+                                        color: '#ff0000',
+                                        shape: 'circle',
+                                        text: '💥 LOSS',
+                                    }));
+                                    candleSeries.setMarkers(markers);
+                                }
+                            }
+
+                            currentTradeProfit = 0;
+                            currentContractId = null;   // ✅ เคลียร์สัญญา พร้อมเปิดใหม่ได้
+                            currentTradeBarriers.contractId = null;
+
+                            let resultStatus = finalProfit >= 0 ? "WIN" : "LOSS";
+                            if (finalProfit === 0) {
+                                if (sellReason.includes("PANIC")) resultStatus = "PROTECTED";
+                                else resultStatus = "BREAK-EVEN";
+                            }
+
+                            resolve({
+                                result: resultStatus,
+                                profit: finalProfit,
+                                time: new Date(),
+                                asset: symbol,
+                                growth: growthRate,
+                                stake: stake,
+                                takeProfit: targetProfit,
+                                reason: sellReason
+                            });
+                        }
+                    };
+
+                    api.on("proposal_open_contract", monitorHandler);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        // ---------- Logging & Session ----------
+        function logTradeResult(result) {
+            const wins = ["WIN", "PROTECTED", "BREAK-EVEN"];
+            if (wins.includes(result.result)) {
+                consecutiveLosses = 0;
+                currentStake = baseStake;
+            } else if (result.result === "LOSS") {
+                consecutiveLosses++;
+                if (riskConfig.reducePct > 0) {
+                    currentStake = currentStake * (1 - riskConfig.reducePct / 100);
+                    if (currentStake < riskConfig.minStake) currentStake = riskConfig.minStake;
+                }
+            }
+
+            // Session Loss Limit
+            if (Math.abs(sessionStats.pnl) >= riskConfig.maxSessionLoss) {
+                stopBot();
+                showStatus(`🛑 SESSION STOPPED: Loss Limit Reached ($${Math.abs(sessionStats.pnl).toFixed(2)} / $${riskConfig.maxSessionLoss})`, "error");
+                return;
+            }
+            // Consecutive Loss Limit
+            if (consecutiveLosses >= riskConfig.maxConsecLoss) {
+                stopBot();
+                showStatus(`🛑 SESSION STOPPED: ${consecutiveLosses} Consecutive Losses (Limit: ${riskConfig.maxConsecLoss})`, "error");
+                return;
+            }
+
+            // Daily Loss Limit is DISABLED - ไม่ตรวจสอบ
+
+            appData.dailyBalance += result.profit;
+            saveAppData();
+
+            sessionStats.pnl += result.profit;
+            if (wins.includes(result.result)) sessionStats.wins++;
+            if (result.result === "LOSS") sessionStats.losses++;
+
+            appData.totalTradesToday++;
+            saveAppData();
+
+            const tradeRecord = {
+                LotNo: appData.currentLotNo,
+                TradeNo: appData.totalTradesToday,
+                asset: result.asset,
+                stake: result.stake,
+                GrowthRate: result.growth,
+                TakeProfit: result.takeProfit,
+                timeTrade: result.time.toLocaleString("th-TH"),
+                result: result.result,
+                profit: result.profit,
+                balanceOnThisLot: sessionStats.pnl,
+                reason: result.reason
+            };
+            currentDetailTrade.push(tradeRecord);
+
+            currentHeadTrade.TotalTrade = appData.currentLotNo;
+            currentHeadTrade.EndTrade = new Date().toLocaleString("th-TH");
+            currentHeadTrade.BalanceOfDay = parseFloat(appData.dailyBalance.toFixed(2));
+            currentHeadTrade.LastTrade = result.time.toLocaleString("th-TH");
+            currentHeadTrade.LastProfit = result.profit;
+
+            saveSessionToLocalStorage();
+            updateStatsUI();
+            updateHeadTradeUI();
+            appendLogTable(tradeRecord);
+        }
+
+        function saveSessionToLocalStorage() {
+            const sessionKey = `derivBot_session_${new Date().toISOString().slice(0, 10)}_${appData.currentLotNo}`;
+            localStorage.setItem(sessionKey, JSON.stringify({ HeadTrade: currentHeadTrade, DetailTrade: currentDetailTrade }));
+        }
+
+        // ---------- UI Updates ----------
+        function updateStatsUI() {
+            document.getElementById("sumTotal").textContent = currentLoop;
+            document.getElementById("sumWin").textContent = sessionStats.wins;
+            document.getElementById("sumLoss").textContent = sessionStats.losses;
+            const pnlEl = document.getElementById("sumPnl");
+            pnlEl.textContent = `${sessionStats.pnl > 0 ? "+" : ""}${sessionStats.pnl.toFixed(2)} USD`;
+            pnlEl.style.color = sessionStats.pnl >= 0 ? "#4caf50" : "#f44336";
+        }
+
+        function appendLogTable(record) {
+            const tbody = document.querySelector("#logTable tbody");
+            const tr = document.createElement("tr");
+            let color = record.profit > 0 ? "#4caf50" : (record.profit < 0 ? "#f44336" : "#ff9800");
+            let resultText = record.result;
+            if (record.reason && record.reason !== "UNKNOWN" && record.profit === 0) resultText += ` <small>(${record.reason})</small>`;
+            tr.innerHTML = `<td>${record.TradeNo}</td><td>${record.timeTrade.split(" ")[1]}</td><td>${record.asset}</td><td style="color:${color}; font-weight:bold;">${resultText}</td><td style="color:${color};">${record.profit > 0 ? "+" : ""}${record.profit.toFixed(2)}</td><td>${Number(record.balanceOnThisLot).toFixed(2)}</td>`;
+            tbody.prepend(tr);
+        }
+
+        function updateHeadTradeUI() {
+            const container = document.getElementById("headTradeDisplay");
+            container.innerHTML = `<table style="text-align:left; max-width: 400px; margin: auto;"><tr><th>Key</th><th>Value</th></tr>
+                <tr><td>CurrentLotNo</td><td>${currentHeadTrade.CurrentLotNo}</td></tr>
+                <tr><td>TotalTrade (Lots)</td><td>${currentHeadTrade.TotalTrade}</td></tr>
+                <tr><td>StartTrade</td><td>${currentHeadTrade.StartTrade}</td></tr>
+                <tr><td>EndTrade</td><td>${currentHeadTrade.EndTrade || "-"}</td></tr>
+                <tr><td>BalanceOfDay</td><td style="color:${currentHeadTrade.BalanceOfDay >= 0 ? "lime" : "red"}">${currentHeadTrade.BalanceOfDay}</td></tr>
+                <tr><td>LastTrade</td><td>${currentHeadTrade.LastTrade || "-"}</td></tr>
+                <tr><td>LastProfit</td><td style="color:${currentHeadTrade.LastProfit >= 0 ? "lime" : "red"}">${currentHeadTrade.LastProfit}</td></tr>
+            </table>`;
+            document.getElementById("detailTradeJson").innerHTML = syntaxHighlight(currentDetailTrade);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+            if (tabName === "session") {
+                document.querySelector("button[onclick=\"switchTab('session')\"]").classList.add("active");
+                document.getElementById("tab-session").style.display = "block";
+            } else {
+                document.querySelector("button[onclick=\"switchTab('headTrade')\"]").classList.add("active");
+                document.getElementById("tab-headTrade").style.display = "block";
+            }
+        }
+
+        function syntaxHighlight(json) {
+            if (typeof json != "string") json = JSON.stringify(json, undefined, 2);
+            json = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = "json-number";
+                if (/^"/.test(match)) { if (/:$/.test(match)) cls = "json-key"; else cls = "json-string"; }
+                else if (/true|false/.test(match)) cls = "json-boolean";
+                else if (/null/.test(match)) cls = "json-null";
+                return '<span class="' + cls + '">' + match + "</span>";
+            });
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById("status");
+            el.innerHTML = msg;
+            el.className = type === "error" ? "status-error" : type === "success" ? "status-success" : "status-info";
+            el.style.display = "block";
+        }
+
+        // ---------- Initialization ----------
+        (function init() {
+            checkNewDay();
+            loadAppData();
+            loadTickDataFromStorage();
+
+            const defaultRate = document.querySelector('.growth-option[data-value="0.03"]');
+            if (defaultRate) defaultRate.click();
+
+            document.querySelectorAll(".growth-option").forEach((opt) => {
+                opt.addEventListener("click", function() {
+                    document.querySelectorAll(".growth-option").forEach((o) => o.classList.remove("selected"));
+                    this.classList.add("selected");
+                    document.getElementById("growthRate").value = this.getAttribute("data-value");
+                });
+            });
+        })();
+    </script>
+</body>
+<script src="https://thepapers.in/phpAllPredictAPI/autoSaveInputs.js"></script>
+
+</html>

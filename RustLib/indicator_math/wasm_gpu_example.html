@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indicator Math Wasm WebGPU Example</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background-color: #1a1a24;
+            color: #fff;
+        }
+
+        pre {
+            background: #2b2b36;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            color: #00ffcc;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #ff3e96;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #ff1c82;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Indicator Math WebGPU Acceleration</h1>
+    <p>This demo creates an array of 1 Millon prices, sends them to the GPU via Wasm/wgpu, and calculates SMA(20)
+        completely in parallel using WebGPU Compute Shaders.</p>
+    <button id="runBtn">🚀 Run 1 Million Array on GPU</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import init, { GpuAnalysisManager } from './wasm_dist/indicatorMath_ULTRA_Rust.js';
+
+        async function run() {
+            const out = document.getElementById('output');
+            out.innerText += "Loading Wasm module...\n";
+
+            try {
+                // Initialize the wasm module
+                await init();
+                out.innerText += "✅ Wasm loaded successfully!\n\n";
+
+                // Check for WebGPU support in this browser
+                if (!navigator.gpu) {
+                    out.innerText += "❌ WebGPU is not supported by your browser!\nPlease test in Chrome/Edge version 113+.\n";
+                    return;
+                }
+
+                out.innerText += "Initializing wgpu bindings (Requesting Adapter & Device)...\n";
+                // Create Wasm instance (This uses wgpu::Instance to request adapter -> device)
+                const gpuManager = await GpuAnalysisManager.initialize();
+                out.innerText += "✅ WebGPU Initialized via Rust wgpu!\n\n";
+
+                // Let's create an array of 1,000,000 prices (simulating history data of multiple assets)
+                const dataSize = 1000000;
+                out.innerText += `Creating Float32Array of ${dataSize.toLocaleString()} prices...\n`;
+                const prices = new Float32Array(dataSize);
+                let price = 100.0;
+                for (let i = 0; i < dataSize; i++) {
+                    price += (Math.random() - 0.5) * 0.1;
+                    prices[i] = price;
+                }
+                out.innerText += `✅ Setup complete it took to setup JS array.\n\n`;
+
+                out.innerText += "Sending Data to VRAM and Dispatching Compute Shader...\n";
+                const t0 = performance.now();
+                // Send Float32Array to Rust -> WGPU VRAM -> Compute Shader -> Await Result -> Read VRAM -> JS
+                const result = await gpuManager.dispatch_compute(prices);
+                const t1 = performance.now();
+
+                out.innerText += `🎉 WebGPU Processed ${dataSize.toLocaleString()} items in ${(t1 - t0).toFixed(2)} ms!\n\n`;
+
+                out.innerText += `Sample Results (SMA 20):\n`;
+                out.innerText += `Price | SMA\n`;
+                for (let i = 15; i <= 25; i++) {
+                    out.innerText += `Index ${i}:   ${prices[i].toFixed(4)}  ->  ${result[i].toFixed(4)}\n`;
+                }
+
+                out.innerText += `...\n`;
+                out.innerText += `Index ${dataSize - 1}: ${prices[dataSize - 1].toFixed(4)}  ->  ${result[dataSize - 1].toFixed(4)}\n`;
+
+            } catch (err) {
+                out.innerText += `❌ Error: ${err}\n`;
+            }
+        }
+
+        document.getElementById('runBtn').addEventListener('click', () => {
+            document.getElementById('output').innerText = "";
+            run();
+        });
+    </script>
+</body>
+
+</html>

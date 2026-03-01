@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategy Monitor — Trading Signal Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2235;
+            --border: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-green: #10b981;
+            --accent-green-glow: rgba(16, 185, 129, 0.3);
+            --accent-red: #ef4444;
+            --accent-red-glow: rgba(239, 68, 68, 0.3);
+            --accent-blue: #3b82f6;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #8b5cf6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #111827 0%, #1e1b4b 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-red);
+            display: inline-block;
+        }
+
+        .status-dot.connected {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green-glow);
+        }
+
+        /* Mode Tabs */
+        .mode-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 16px 24px;
+            background: var(--bg-primary);
+        }
+
+        .mode-tab {
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .mode-tab:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .mode-tab.active {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .mode-tab .emoji {
+            margin-right: 6px;
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            gap: 16px;
+            padding: 0 24px 24px;
+            max-height: calc(100vh - 130px);
+        }
+
+        /* Signal Display (left) */
+        .signal-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Big Signal Card */
+        .signal-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .signal-card.signal-call {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 40px var(--accent-green-glow), inset 0 0 40px rgba(16, 185, 129, 0.05);
+        }
+
+        .signal-card.signal-put {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 40px var(--accent-red-glow), inset 0 0 40px rgba(239, 68, 68, 0.05);
+        }
+
+        .signal-action {
+            font-size: 64px;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+        }
+
+        .signal-action.call {
+            color: var(--accent-green);
+        }
+
+        .signal-action.put {
+            color: var(--accent-red);
+        }
+
+        .signal-action.wait {
+            color: var(--text-muted);
+            font-size: 48px;
+        }
+
+        .signal-strategy {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .signal-strategy span {
+            color: var(--accent-purple);
+            font-weight: 700;
+        }
+
+        /* Choppy Zone */
+        .choppy-bar {
+            display: flex;
+            gap: 4px;
+            margin-top: 16px;
+        }
+
+        .choppy-segment {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            opacity: 0.3;
+            transition: all 0.3s;
+        }
+
+        .choppy-segment.active {
+            opacity: 1;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .seg-a {
+            background: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .seg-b {
+            background: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .seg-c {
+            background: var(--accent-yellow);
+            color: var(--accent-yellow);
+        }
+
+        .seg-d {
+            background: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .choppy-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .choppy-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+
+        .choppy-zone-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Signal Log (right) */
+        .log-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 130px);
+        }
+
+        .log-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-header button {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .log-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .log-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            animation: slideIn 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .log-item:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .log-item .badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 44px;
+            text-align: center;
+        }
+
+        .badge.call {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .badge.put {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .badge.wait {
+            background: rgba(100, 116, 139, 0.15);
+            color: var(--text-muted);
+        }
+
+        .log-item .time {
+            color: var(--text-muted);
+            font-size: 11px;
+            min-width: 55px;
+        }
+
+        .log-item .strat {
+            color: var(--text-secondary);
+        }
+
+        .log-item .zone-tag {
+            margin-left: auto;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .zone-tag.A {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+        }
+
+        .zone-tag.B {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+        }
+
+        .zone-tag.C {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-yellow);
+        }
+
+        .zone-tag.D {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+        }
+
+        /* Config Panel */
+        .config-section {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .config-section label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .config-section input,
+        .config-section select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .config-section input:focus,
+        .config-section select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Pulse Animation */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .signal-card.signal-call,
+        .signal-card.signal-put {
+            animation: pulse 1.5s ease-in-out 1;
+        }
+
+        /* Volume Slider */
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .volume-control input[type=range] {
+            width: 60px;
+            accent-color: var(--accent-purple);
+        }
+
+        /* Scrollbar */
+        .log-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-list::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <h1>⚡ Strategy Monitor</h1>
+        <div class="header-right">
+            <div class="volume-control">
+                <span style="font-size:14px">🔊</span>
+                <input type="range" id="volumeSlider" min="0" max="100" value="70">
+            </div>
+            <span id="statusText" style="font-size:13px; color: var(--text-muted);">Disconnected</span>
+            <span id="statusDot" class="status-dot"></span>
+        </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+        <div class="mode-tab active" onclick="selectMode('cpu')" id="tab-cpu">
+            <span class="emoji">🟢</span>CPU (WASM)
+        </div>
+        <div class="mode-tab" onclick="selectMode('gpu')" id="tab-gpu">
+            <span class="emoji">🟡</span>GPU (WebGPU)
+        </div>
+        <div class="mode-tab" onclick="selectMode('rust')" id="tab-rust">
+            <span class="emoji">🔵</span>Rust (WebSocket)
+        </div>
+    </div>
+
+    <!-- Config -->
+    <div class="config-section" id="configSection">
+        <!-- CPU/GPU Mode -->
+        <div id="config-wasm" style="display:flex; gap:12px; align-items:center;">
+            <label>WASM Path:</label>
+            <input type="text" id="wasmPath" value="./pkg/indicator_math.js" style="width:240px">
+        </div>
+        <!-- Rust Mode -->
+        <div id="config-rust" style="display:none; gap:12px; align-items:center;">
+            <label>Server URL:</label>
+            <input type="text" id="serverUrl" value="ws://localhost:3000/ws" style="width:240px">
+            <label>Token:</label>
+            <input type="text" id="derivToken" value="" placeholder="Deriv Token" style="width:160px">
+        </div>
+
+        <button class="btn-primary" onclick="startBot()" id="btnStart">▶ เริ่มทำงาน</button>
+        <button class="btn-danger" onclick="stopBot()" id="btnStop" style="display:none">■ หยุด</button>
+    </div>
+
+    <!-- Main -->
+    <div class="main-grid">
+        <!-- Left: Signal -->
+        <div class="signal-panel">
+            <!-- Big Signal -->
+            <div class="signal-card" id="signalCard">
+                <div class="signal-action wait" id="signalAction">WAIT</div>
+                <div class="signal-strategy">กลยุทธ์: <span id="signalStrategy">—</span></div>
+
+                <!-- Choppy Zone Bar -->
+                <div style="margin-top:20px">
+                    <div style="font-size:12px; color: var(--text-muted); margin-bottom:8px">CHOPPY INDEX ZONE</div>
+                    <div class="choppy-bar">
+                        <div class="choppy-segment seg-a" id="segA"></div>
+                        <div class="choppy-segment seg-b" id="segB"></div>
+                        <div class="choppy-segment seg-c" id="segC"></div>
+                        <div class="choppy-segment seg-d" id="segD"></div>
+                    </div>
+                    <div class="choppy-labels">
+                        <span>
+                            < 38.2 (Trend)</span>
+                                <span>38–50</span>
+                                <span>50–62</span>
+                                <span>> 62 (Sideways)</span>
+                    </div>
+                    <div class="choppy-value" id="choppyValue">—</div>
+                    <div class="choppy-zone-label" id="choppyZoneLabel" style="color: var(--text-muted)">รอข้อมูล...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-label">Total Signals</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">CALL</div>
+                    <div class="stat-value" style="color:var(--accent-green)" id="statCall">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">PUT</div>
+                    <div class="stat-value" style="color:var(--accent-red)" id="statPut">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Mode</div>
+                    <div class="stat-value" style="font-size:16px; color:var(--accent-purple)" id="statMode">CPU</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Log -->
+        <div class="log-panel">
+            <div class="log-header">
+                📋 Signal Log
+                <button onclick="clearLog()">Clear</button>
+            </div>
+            <div class="log-list" id="logList">
+                <div style="color:var(--text-muted); text-align:center; padding:40px 0; font-size:13px">
+                    ยังไม่มี signal — กดปุ่ม ▶ เพื่อเริ่ม
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="strategy_engine.js"></script>
+    <script>
+        // ==========================================
+        //  State
+        // ==========================================
+        let currentMode = "cpu";
+        let botInstance = null;
+        let isRunning = false;
+        let stats = { total: 0, call: 0, put: 0 };
+        let logEntries = [];
+        let audioCtx = null;
+
+        // ==========================================
+        //  Mode Selection
+        // ==========================================
+        function selectMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + mode).classList.add('active');
+
+            document.getElementById('config-wasm').style.display = (mode === 'rust') ? 'none' : 'flex';
+            document.getElementById('config-rust').style.display = (mode === 'rust') ? 'flex' : 'none';
+            document.getElementById('statMode').textContent = mode.toUpperCase();
+        }
+
+        // ==========================================
+        //  Beep Sound (Web Audio API)
+        // ==========================================
+        function playBeep(type) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const volume = document.getElementById('volumeSlider').value / 100;
+            if (volume === 0) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === "CALL") {
+                // เสียงสูงขึ้น 2 จังหวะ (cheerful)
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(volume * 0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === "PUT") {
+                // เสียงต่ำลง 2 จังหวะ (warning)
+                osc.type = "square";
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(volume * 0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        // ==========================================
+        //  UI Update
+        // ==========================================
+        function updateSignalDisplay(signal, analysis) {
+            const card = document.getElementById('signalCard');
+            const actionEl = document.getElementById('signalAction');
+            const stratEl = document.getElementById('signalStrategy');
+
+            // Remove old classes
+            card.classList.remove('signal-call', 'signal-put');
+            actionEl.classList.remove('call', 'put', 'wait');
+
+            if (signal.action === "CALL") {
+                card.classList.add('signal-call');
+                actionEl.classList.add('call');
+                actionEl.textContent = "▲ CALL";
+                playBeep("CALL");
+                stats.call++;
+                stats.total++;
+            } else if (signal.action === "PUT") {
+                card.classList.add('signal-put');
+                actionEl.classList.add('put');
+                actionEl.textContent = "▼ PUT";
+                playBeep("PUT");
+                stats.put++;
+                stats.total++;
+            } else {
+                actionEl.classList.add('wait');
+                actionEl.textContent = "WAIT";
+            }
+
+            stratEl.textContent = signal.strategy || "—";
+
+            // Force re-animation
+            card.style.animation = 'none';
+            card.offsetHeight;
+            card.style.animation = '';
+
+            // Choppy Zone
+            if (analysis) {
+                const choppy = analysis.choppy_indicator || 0;
+                document.getElementById('choppyValue').textContent = choppy.toFixed(1);
+                updateChoppyBar(choppy);
+            }
+
+            // Stats
+            document.getElementById('statTotal').textContent = stats.total;
+            document.getElementById('statCall').textContent = stats.call;
+            document.getElementById('statPut').textContent = stats.put;
+        }
+
+        function updateChoppyBar(choppy) {
+            ['segA', 'segB', 'segC', 'segD'].forEach(id => document.getElementById(id).classList.remove('active'));
+            const label = document.getElementById('choppyZoneLabel');
+            const valueEl = document.getElementById('choppyValue');
+
+            if (choppy < 38.2) {
+                document.getElementById('segA').classList.add('active');
+                label.textContent = "Zone A — Strong Trend 🔥";
+                label.style.color = "var(--accent-green)";
+                valueEl.style.color = "var(--accent-green)";
+            } else if (choppy < 50) {
+                document.getElementById('segB').classList.add('active');
+                label.textContent = "Zone B — Moderate Trend 🌊";
+                label.style.color = "var(--accent-blue)";
+                valueEl.style.color = "var(--accent-blue)";
+            } else if (choppy <= 61.8) {
+                document.getElementById('segC').classList.add('active');
+                label.textContent = "Zone C — Transition ⚡";
+                label.style.color = "var(--accent-yellow)";
+                valueEl.style.color = "var(--accent-yellow)";
+            } else {
+                document.getElementById('segD').classList.add('active');
+                label.textContent = "Zone D — Sideways 🏓";
+                label.style.color = "var(--accent-red)";
+                valueEl.style.color = "var(--accent-red)";
+            }
+        }
+
+        function addLogEntry(signal) {
+            const list = document.getElementById('logList');
+            if (stats.total === 0 && signal.action === "WAIT") return; // ไม่ log WAIT ตัวแรก
+
+            // ลบ placeholder
+            if (list.querySelector('div[style]') && stats.total > 0) {
+                list.innerHTML = '';
+            }
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const zone = (signal.choppy_zone || "").charAt(0);
+            const badgeClass = signal.action === "CALL" ? "call" : signal.action === "PUT" ? "put" : "wait";
+
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            item.innerHTML = `
+            <span class="time">${timeStr}</span>
+            <span class="badge ${badgeClass}">${signal.action}</span>
+            <span class="strat">${signal.strategy}</span>
+            <span class="zone-tag ${zone}">${signal.choppy_zone || ""}</span>
+        `;
+
+            list.insertBefore(item, list.firstChild);
+
+            // เก็บไม่เกิน 100 รายการ
+            while (list.children.length > 100) list.removeChild(list.lastChild);
+        }
+
+        function clearLog() {
+            document.getElementById('logList').innerHTML = '';
+            stats = { total: 0, call: 0, put: 0 };
+            document.getElementById('statTotal').textContent = '0';
+            document.getElementById('statCall').textContent = '0';
+            document.getElementById('statPut').textContent = '0';
+        }
+
+        function setConnected(connected) {
+            document.getElementById('statusDot').classList.toggle('connected', connected);
+            document.getElementById('statusText').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        // ==========================================
+        //  Bot Control
+        // ==========================================
+        function handleSignal(signal, analysis) {
+            updateSignalDisplay(signal, analysis);
+            if (signal.action !== "WAIT") addLogEntry(signal);
+        }
+
+        async function startBot() {
+            if (isRunning) return;
+
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'inline-block';
+            isRunning = true;
+
+            if (currentMode === "cpu") {
+                await startCpuMode();
+            } else if (currentMode === "gpu") {
+                await startGpuMode();
+            } else {
+                startRustMode();
+            }
+        }
+
+        function stopBot() {
+            isRunning = false;
+            document.getElementById('btnStart').style.display = 'inline-block';
+            document.getElementById('btnStop').style.display = 'none';
+            setConnected(false);
+
+            if (botInstance && botInstance.disconnect) botInstance.disconnect();
+            botInstance = null;
+        }
+
+        // ---------- CPU Mode ----------
+        async function startCpuMode() {
+            setConnected(false);
+            addLogEntry({ action: "WAIT", strategy: "🟢 CPU Mode — กำลังโหลด WASM...", choppy_zone: "" });
+
+            try {
+                // NOTE: ต้อง build WASM ก่อน → wasm-pack build --target web
+                // แล้ววาง pkg/ folder ไว้ใน public/strategy/
+                const wasmPath = document.getElementById('wasmPath').value;
+
+                // สำหรับ Demo: ใช้ Simulated data
+                setConnected(true);
+                addLogEntry({ action: "WAIT", strategy: "✅ พร้อมใช้งาน — กำลังรับ tick...", choppy_zone: "" });
+                startSimulation(); // ← เปลี่ยนเป็น real WASM เมื่อ build เสร็จ
+            } catch (e) {
+                addLogEntry({ action: "WAIT", strategy: "❌ โหลด WASM ล้มเหลว: " + e.message, choppy_zone: "" });
+            }
+        }
+
+        // ---------- GPU Mode ----------
+        async function startGpuMode() {
+            setConnected(false);
+            addLogEntry({ action: "WAIT", strategy: "🟡 GPU Mode — กำลังตรวจ WebGPU...", choppy_zone: "" });
+
+            if (!navigator.gpu) {
+                addLogEntry({ action: "WAIT", strategy: "⚠️ Browser ไม่รองรับ WebGPU → Fallback CPU", choppy_zone: "" });
+            }
+
+            setConnected(true);
+            addLogEntry({ action: "WAIT", strategy: "✅ พร้อมใช้งาน — กำลังรับ tick...", choppy_zone: "" });
+            startSimulation();
+        }
+
+        // ---------- Rust Mode ----------
+        function startRustMode() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const token = document.getElementById('derivToken').value;
+
+            addLogEntry({ action: "WAIT", strategy: "🔵 Rust Mode — กำลังเชื่อมต่อ " + serverUrl, choppy_zone: "" });
+
+            try {
+                const ws = new WebSocket(serverUrl);
+
+                ws.onopen = () => {
+                    setConnected(true);
+                    addLogEntry({ action: "WAIT", strategy: "✅ เชื่อมต่อ Server สำเร็จ", choppy_zone: "" });
+                    if (token) {
+                        ws.send(JSON.stringify({ command: "START_DERIV", token }));
+                    }
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === "analysis_data" && msg.data) {
+                            const analysis = msg.data;
+                            const signal = evaluateAllStrategies(analysis);
+                            signal.choppy_zone = getChoppyZoneName(analysis.choppy_indicator);
+                            handleSignal(signal, analysis);
+                        }
+                    } catch (e) { /* ignore non-JSON */ }
+                };
+
+                ws.onclose = () => {
+                    setConnected(false);
+                    if (isRunning) {
+                        addLogEntry({ action: "WAIT", strategy: "⚠️ ขาดการเชื่อมต่อ — ลองใหม่...", choppy_zone: "" });
+                        setTimeout(() => { if (isRunning) startRustMode(); }, 3000);
+                    }
+                };
+
+                ws.onerror = () => setConnected(false);
+                botInstance = { disconnect: () => ws.close() };
+            } catch (e) {
+                addLogEntry({ action: "WAIT", strategy: "❌ เชื่อมต่อล้มเหลว", choppy_zone: "" });
+            }
+        }
+
+        // ==========================================
+        //  Simulation (Demo) — ลบเมื่อใช้ WASM/Rust จริง
+        // ==========================================
+        let simInterval = null;
+
+        function startSimulation() {
+            let tick = 0;
+            simInterval = setInterval(() => {
+                if (!isRunning) { clearInterval(simInterval); return; }
+                tick++;
+
+                // สร้างข้อมูล analysis จำลอง
+                const choppy = 20 + Math.random() * 60; // สุ่ม 20-80
+                const rsi = 20 + Math.random() * 60;
+                const adx = 10 + Math.random() * 30;
+
+                const fakeAnalysis = {
+                    ema_short_direction: Math.random() > 0.5 ? "Up" : "Down",
+                    ema_medium_direction: Math.random() > 0.5 ? "Up" : "Down",
+                    ema_long_direction: Math.random() > 0.5 ? "Up" : "Down",
+                    ema_above: Math.random() > 0.5 ? "ShortAbove" : "MediumAbove",
+                    ema_long_above: Math.random() > 0.5 ? "MediumAbove" : "LongAbove",
+                    ema_short_turn_type: Math.random() > 0.85 ? "TurnUp" : Math.random() > 0.85 ? "TurnDown" : "-",
+                    ema_convergence_type: Math.random() > 0.5 ? "divergence" : "convergence",
+                    ema_long_convergence_type: Math.random() > 0.5 ? "D" : "C",
+                    ema_cut_long_type: Math.random() > 0.9 ? "UpTrend" : "none",
+                    candles_since_ema_cut: Math.floor(Math.random() * 10),
+                    choppy_indicator: choppy,
+                    rsi_value: rsi,
+                    adx_value: adx,
+                    atr: 0.5 + Math.random() * 2,
+                    bb_position: ["NearLower", "Middle", "NearUpper"][Math.floor(Math.random() * 3)],
+                    color: Math.random() > 0.45 ? "Green" : "Red",
+                    body_percent: 10 + Math.random() * 80,
+                    l_wick_percent: Math.random() * 70,
+                    u_wick_percent: Math.random() * 70,
+                    is_abnormal_candle: Math.random() > 0.95,
+                    is_abnormal_atr: false,
+                    close: 100 + Math.random() * 10,
+                    low: 99 + Math.random() * 5,
+                    high: 103 + Math.random() * 5,
+                    up_con_medium_ema: Math.floor(Math.random() * 8),
+                    up_con_long_ema: Math.floor(Math.random() * 5),
+                    down_con_medium_ema: Math.floor(Math.random() * 8),
+                    down_con_long_ema: Math.floor(Math.random() * 5),
+                    macd_12: Math.random() * 2,
+                    previous_macd_12: Math.random() * 2,
+                    loss_con: 0,
+                    status_desc: "",
+                    smc: null
+                };
+
+                const signal = evaluateAllStrategies(fakeAnalysis);
+                signal.choppy_zone = getChoppyZoneName(choppy);
+                handleSignal(signal, fakeAnalysis);
+
+            }, 2000); // ทุก 2 วินาที
+
+            botInstance = { disconnect: () => clearInterval(simInterval) };
+        }
+
+        function getChoppyZoneName(choppy) {
+            const c = choppy || 100;
+            if (c < 38.2) return "A_StrongTrend";
+            if (c < 50) return "B_ModerateTrend";
+            if (c <= 61.8) return "C_Transition";
+            return "D_Sideways";
+        }
+    </script>
+
+</body>
+
+</html>

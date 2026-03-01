@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indicator Math Wasm Example</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Indicator Math Wasm CPU Benchmark</h1>
+    <button id="runBtn">Run Wasm Analysis</button>
+    <pre id="output"></pre>
+
+    <!-- Notice the type="module" -->
+    <script type="module">
+        import init, { WasmAnalysisGenerator } from './wasm_dist/indicatorMath_ULTRA_Rust.js';
+
+        async function run() {
+            const out = document.getElementById('output');
+            out.innerText += "Loading Wasm module...\n";
+            
+            try {
+                // Initialize the wasm module
+                await init();
+                out.innerText += "✅ Wasm loaded successfully!\n\n";
+
+                // Initialize options matching Rust `AnalysisOptions` shape
+                const options = {
+                    ema1_period: 20,
+                    ema1_type: "EMA",
+                    ema2_period: 50,
+                    ema2_type: "EMA",
+                    ema3_period: 200,
+                    ema3_type: "EMA",
+                    atr_period: 14,
+                    atr_multiplier: 2.0,
+                    bb_period: 20,
+                    ci_period: 14,
+                    adx_period: 14,
+                    rsi_period: 14,
+                    flat_threshold: 0.1,
+                    macd_narrow: 0.05
+                };
+
+                // Create Wasm instance
+                const generator = new WasmAnalysisGenerator(JSON.stringify(options));
+                
+                // Add enough history to cover ema3_period (200)
+                const history = [];
+                let price = 100;
+                for(let i=0; i<300; i++) {
+                    const volatility = (Math.random() - 0.5) * 5;
+                    price += volatility;
+                    history.push({
+                        time: 1700000000 + i * 60,
+                        open: price,
+                        high: price + Math.abs(volatility),
+                        low: price - Math.abs(volatility),
+                        close: price + volatility * 0.5
+                    });
+                }
+
+                // Initialize state
+                out.innerText += `Processing ${history.length} history candles...\n`;
+                const t0 = performance.now();
+                generator.initialize(JSON.stringify(history));
+                const t1 = performance.now();
+                out.innerText += `✅ Initialized in ${(t1 - t0).toFixed(2)} ms.\n\n`;
+
+                out.innerText += "Simulating live ticks...\n";
+                // Simulate ticks
+                const tickStart = performance.now();
+                
+                let lastResult = null;
+                // Add 100 ticks (over 2 new minutes to close candles)
+                for(let i=0; i<100; i++) {
+                    // Update price
+                    price += (Math.random() - 0.5);
+                    const timeTick = history[history.length-1].time + (i * 2); // advance 2 secs per tick
+                    let result = generator.append_tick(price, timeTick);
+                    
+                    if(result !== null && result !== undefined) {
+                      lastResult = result;
+                    }
+                }
+                const tickEnd = performance.now();
+                
+                out.innerText += `✅ Processed 100 ticks in ${(tickEnd - tickStart).toFixed(2)} ms.\n\n`;
+                
+                if(lastResult) {
+                  out.innerText += `📊 Latest Closed Candle Result (Status: ${lastResult.status_desc}):\n`;
+                  out.innerText += JSON.stringify(lastResult, null, 2);
+                } else {
+                  out.innerText += "No candle closed during tick simulation.";
+                }
+
+            } catch (err) {
+                out.innerText += `❌ Error: ${err}\n`;
+            }
+        }
+
+        document.getElementById('runBtn').addEventListener('click', () => {
+             document.getElementById('output').innerText = "";
+             run();
+        });
+    </script>
+</body>
+</html>

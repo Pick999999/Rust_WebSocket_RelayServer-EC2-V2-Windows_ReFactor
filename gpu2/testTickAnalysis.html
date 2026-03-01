@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test AnalysisGeneratorTick - Incremental Mode</title>
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="js/clsAnalysisGenerator.js"></script>
+    <script src="js/clsAnalysisGeneratorTick.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 16px;
+        }
+
+        h1 {
+            font-size: 1.3em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #16213e;
+            border-radius: 8px;
+            border: 1px solid #0f3460;
+        }
+
+        label {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        select,
+        button {
+            padding: 6px 14px;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: #fff;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button.btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        #chartContainer {
+            width: 100%;
+            height: 350px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #0f3460;
+            margin-bottom: 12px;
+        }
+
+        .info-bar {
+            display: flex;
+            gap: 16px;
+            padding: 8px 12px;
+            background: #16213e;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.85em;
+            flex-wrap: wrap;
+            border: 1px solid #0f3460;
+        }
+
+        .info-bar .item {
+            display: flex;
+            gap: 4px;
+        }
+
+        .info-bar .label {
+            color: #888;
+        }
+
+        .info-bar .value {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+
+        .info-bar .value.green {
+            color: #4caf50;
+        }
+
+        .info-bar .value.red {
+            color: #f44336;
+        }
+
+        #logArea {
+            width: 100%;
+            height: 120px;
+            background: #0d1117;
+            color: #8b949e;
+            border: 1px solid #0f3460;
+            border-radius: 8px;
+            padding: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.8em;
+            resize: vertical;
+            margin-bottom: 12px;
+        }
+
+        #analysisArea {
+            width: 100%;
+            height: 300px;
+            background: #0d1117;
+            color: #c9d1d9;
+            border: 1px solid #0f3460;
+            border-radius: 8px;
+            padding: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.75em;
+            resize: vertical;
+        }
+
+        .section-title {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .badge-connected {
+            background: #1b5e20;
+            color: #4caf50;
+        }
+
+        .badge-disconnected {
+            background: #4a1010;
+            color: #f44336;
+        }
+
+        .badge-waiting {
+            background: #33301a;
+            color: #ff9800;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔬 Test AnalysisGeneratorTick (Incremental Mode)</h1>
+
+    <div class="controls">
+        <div>
+            <label>Asset:</label>
+            <select id="selAsset">
+                <option value="R_10">R_10 (Vol 10)</option>
+                <option value="R_25">R_25 (Vol 25)</option>
+                <option value="R_50" selected>R_50 (Vol 50)</option>
+                <option value="R_75">R_75 (Vol 75)</option>
+                <option value="R_100">R_100 (Vol 100)</option>
+                <option value="1HZ10V">1HZ10V (Vol 10 1s)</option>
+                <option value="1HZ25V">1HZ25V (Vol 25 1s)</option>
+                <option value="1HZ50V">1HZ50V (Vol 50 1s)</option>
+                <option value="1HZ75V">1HZ75V (Vol 75 1s)</option>
+                <option value="1HZ100V">1HZ100V (Vol 100 1s)</option>
+            </select>
+        </div>
+        <div>
+            <label>History:</label>
+            <select id="selCount">
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+        </div>
+        <button id="btnStart" onclick="startTest()">▶ Connect & Start</button>
+        <button id="btnStop" class="btn-danger" onclick="stopTest()" disabled>■ Stop</button>
+        <span id="wsStatus" class="badge badge-disconnected">Disconnected</span>
+    </div>
+
+    <div id="chartContainer"></div>
+
+    <div class="info-bar">
+        <div class="item"><span class="label">Candles:</span> <span class="value" id="valCandleCount">0</span></div>
+        <div class="item"><span class="label">Ticks:</span> <span class="value" id="valTickCount">0</span></div>
+        <div class="item"><span class="label">Price:</span> <span class="value" id="valPrice">-</span></div>
+        <div class="item"><span class="label">Building:</span> <span class="value" id="valBuilding">-</span></div>
+        <div class="item"><span class="label">EMA7:</span> <span class="value" id="valEma1">-</span></div>
+        <div class="item"><span class="label">EMA25:</span> <span class="value" id="valEma2">-</span></div>
+        <div class="item"><span class="label">EMA99:</span> <span class="value" id="valEma3">-</span></div>
+        <div class="item"><span class="label">RSI:</span> <span class="value" id="valRsi">-</span></div>
+        <div class="item"><span class="label">ADX:</span> <span class="value" id="valAdx">-</span></div>
+        <div class="item"><span class="label">CI:</span> <span class="value" id="valCi">-</span></div>
+    </div>
+
+    <div class="section-title">📋 Event Log</div>
+    <textarea id="logArea" readonly></textarea>
+
+    <div class="section-title">
+        📊 Analysis Data (Last 5 entries)
+        <button onclick="copyAnalysis()" style="font-size:0.8em; padding:3px 10px;">📋 Copy All</button>
+    </div>
+    <textarea id="analysisArea" readonly></textarea>
+
+    <script>
+        // ===== Global State =====
+        let ws = null;
+        let chart = null;
+        let candleSeries = null;
+        let ema1Line = null, ema2Line = null, ema3Line = null;
+        let subscriptionId = null;
+
+        let gen = null;             // AnalysisGeneratorTick instance
+        let candleHistory = [];     // History candle data
+        let currentCandle = null;   // Candle ที่กำลังสะสม tick
+        let tickCount = 0;
+
+        const APP_ID = 1089;
+
+        // ===== Logging =====
+        function log(msg) {
+            const area = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString('th-TH');
+            area.value = `[${time}] ${msg}\n` + area.value;
+            if (area.value.length > 10000) area.value = area.value.substring(0, 10000);
+        }
+
+        // ===== Chart Setup =====
+        function initChart() {
+            const container = document.getElementById('chartContainer');
+            chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: 350,
+                layout: { background: { type: 'solid', color: '#1a1a2e' }, textColor: '#d4d4d4' },
+                grid: { vertLines: { color: '#1e2a3a' }, horzLines: { color: '#1e2a3a' } },
+                rightPriceScale: { borderColor: '#0f3460' },
+                timeScale: { borderColor: '#0f3460', timeVisible: true, secondsVisible: false },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            });
+
+            ema1Line = chart.addLineSeries({ color: '#ffeb3b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            ema2Line = chart.addLineSeries({ color: '#2196f3', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            ema3Line = chart.addLineSeries({ color: '#e91e63', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+
+            new ResizeObserver(entries => {
+                if (entries[0]) chart.applyOptions({ width: entries[0].contentRect.width });
+            }).observe(container);
+        }
+
+        // ===== Start Test =====
+        async function startTest() {
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+
+            initChart();
+
+            const asset = document.getElementById('selAsset').value;
+            const count = parseInt(document.getElementById('selCount').value);
+
+            log(`Connecting to Deriv API... Asset: ${asset}, Count: ${count}`);
+            setStatus('waiting', 'Connecting...');
+
+            // Connect WebSocket
+            ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${APP_ID}`);
+
+            ws.onopen = () => {
+                log('✅ WebSocket Connected');
+                setStatus('connected', 'Connected');
+
+                // Step 1: Request candle history (granularity=60 = 1 min candles)
+                ws.send(JSON.stringify({
+                    ticks_history: asset,
+                    adjust_start_time: 1,
+                    count: count,
+                    end: "latest",
+                    style: "candles",
+                    granularity: 60
+                }));
+
+                // Step 2: Subscribe to tick stream
+                ws.send(JSON.stringify({
+                    ticks_history: asset,
+                    adjust_start_time: 1,
+                    count: 0,
+                    end: "latest",
+                    style: "ticks",
+                    subscribe: 1
+                }));
+            };
+
+            ws.onmessage = (evt) => {
+                const data = JSON.parse(evt.data);
+                handleMessage(data);
+            };
+
+            ws.onerror = (err) => {
+                log('❌ WebSocket Error');
+                setStatus('disconnected', 'Error');
+            };
+
+            ws.onclose = () => {
+                log('🔌 WebSocket Closed');
+                setStatus('disconnected', 'Disconnected');
+            };
+        }
+
+        // ===== Handle Messages =====
+        function handleMessage(data) {
+            // 1. Candle History Response
+            if (data.candles) {
+                candleHistory = data.candles.map(c => ({
+                    time: c.epoch,
+                    open: parseFloat(c.open),
+                    high: parseFloat(c.high),
+                    low: parseFloat(c.low),
+                    close: parseFloat(c.close)
+                }));
+
+                log(`📊 Received ${candleHistory.length} candles history`);
+
+                // Draw candles on chart
+                candleSeries.setData(candleHistory);
+
+                // Create AnalysisGeneratorTick and run initial generate()
+                const options = {
+                    ema1Period: 7, ema1Type: 'EMA',
+                    ema2Period: 25, ema2Type: 'EMA',
+                    ema3Period: 99, ema3Type: 'EMA',
+                    atrPeriod: 14, atrMultiplier: 2,
+                    bbPeriod: 20, ciPeriod: 14,
+                    adxPeriod: 14, rsiPeriod: 14,
+                    flatThreshold: 0.0001, macdNarrow: 0.15
+                };
+
+                gen = new AnalysisGeneratorTick(candleHistory, options);
+                const t0 = performance.now();
+                const result = gen.generate();
+                const t1 = performance.now();
+
+                log(`⚡ Initial generate() done: ${result.length} entries in ${(t1 - t0).toFixed(1)}ms`);
+
+                // Draw EMA lines from initial data
+                updateEMALines();
+                updateInfoBar();
+                updateAnalysisArea();
+
+                document.getElementById('valCandleCount').textContent = candleHistory.length;
+            }
+
+            // 2. Tick Stream
+            if (data.tick) {
+                const price = parseFloat(data.tick.quote);
+                const epoch = data.tick.epoch;
+                const date = new Date(epoch * 1000);
+                tickCount++;
+
+                if (data.subscription) subscriptionId = data.subscription.id;
+
+                document.getElementById('valTickCount').textContent = tickCount;
+                document.getElementById('valPrice').textContent = price.toFixed(3);
+
+                // สะสม tick เป็น candle
+                if (!currentCandle) {
+                    currentCandle = { time: epoch, open: price, high: price, low: price, close: price };
+                } else {
+                    currentCandle.high = Math.max(currentCandle.high, price);
+                    currentCandle.low = Math.min(currentCandle.low, price);
+                    currentCandle.close = price;
+                }
+
+                // แสดงสถานะ candle ที่กำลังสร้าง
+                const sec = date.getSeconds();
+                document.getElementById('valBuilding').textContent =
+                    `O:${currentCandle.open.toFixed(2)} H:${currentCandle.high.toFixed(2)} L:${currentCandle.low.toFixed(2)} C:${price.toFixed(2)} (${sec}s)`;
+
+                // อัปเดต chart แบบ real-time (อัปเดต candle ปัจจุบันบนกราฟ)
+                if (candleSeries) {
+                    // ใช้ time เป็น epoch ที่ round ลง minute
+                    const minuteEpoch = Math.floor(epoch / 60) * 60;
+                    candleSeries.update({
+                        time: minuteEpoch,
+                        open: currentCandle.open,
+                        high: currentCandle.high,
+                        low: currentCandle.low,
+                        close: currentCandle.close
+                    });
+                }
+
+                // เมื่อ seconds = 0 → candle สมบูรณ์ → เรียก appendCandle()
+                if (sec === 0 && gen) {
+                    // ปิด candle ก่อนหน้า
+                    const completedCandle = { ...currentCandle };
+                    // ใช้เวลาเป็น epoch ของนาทีก่อนหน้า (round ลง)
+                    completedCandle.time = Math.floor((epoch - 1) / 60) * 60;
+
+                    const t0 = performance.now();
+                    const newEntry = gen.appendCandle(completedCandle);
+                    const t1 = performance.now();
+
+                    log(`🕐 appendCandle() → ${(t1 - t0).toFixed(3)}ms | EMA7=${newEntry.emaShortValue} RSI=${newEntry.rsiValue} CI=${newEntry.choppyIndicator}`);
+
+                    // อัปเดต chart EMA lines
+                    updateEMALines();
+                    updateInfoBar();
+                    updateAnalysisArea();
+
+                    document.getElementById('valCandleCount').textContent = gen.analysisArray.length;
+
+                    // เริ่ม candle ใหม่
+                    currentCandle = { time: epoch, open: price, high: price, low: price, close: price };
+                }
+            }
+        }
+
+        // ===== Update EMA Lines on Chart =====
+        function updateEMALines() {
+            if (!gen || !gen.analysisArray || gen.analysisArray.length === 0) return;
+
+            const ema1Data = [], ema2Data = [], ema3Data = [];
+
+            gen.analysisArray.forEach(a => {
+                if (a.emaShortValue !== null) ema1Data.push({ time: a.candletime, value: a.emaShortValue });
+                if (a.emaMediumValue !== null) ema2Data.push({ time: a.candletime, value: a.emaMediumValue });
+                if (a.emaLongValue !== null) ema3Data.push({ time: a.candletime, value: a.emaLongValue });
+            });
+
+            if (ema1Line) ema1Line.setData(ema1Data);
+            if (ema2Line) ema2Line.setData(ema2Data);
+            if (ema3Line) ema3Line.setData(ema3Data);
+        }
+
+        // ===== Update Info Bar =====
+        function updateInfoBar() {
+            if (!gen || gen.analysisArray.length === 0) return;
+            const last = gen.analysisArray[gen.analysisArray.length - 1];
+
+            document.getElementById('valEma1').textContent = last.emaShortValue || '-';
+            document.getElementById('valEma2').textContent = last.emaMediumValue || '-';
+            document.getElementById('valEma3').textContent = last.emaLongValue || '-';
+
+            const rsiEl = document.getElementById('valRsi');
+            rsiEl.textContent = last.rsiValue || '-';
+            rsiEl.className = 'value' + (last.rsiValue > 70 ? ' red' : (last.rsiValue < 30 ? ' green' : ''));
+
+            document.getElementById('valAdx').textContent = last.adxValue || '-';
+            document.getElementById('valCi').textContent = last.choppyIndicator || '-';
+        }
+
+        // ===== Update Analysis Textarea =====
+        function updateAnalysisArea() {
+            if (!gen || gen.analysisArray.length === 0) return;
+
+            // แสดง 5 entries ล่าสุด
+            const last5 = gen.analysisArray.slice(-5);
+            document.getElementById('analysisArea').value = JSON.stringify(last5, null, 2);
+        }
+
+        // ===== Copy Analysis =====
+        function copyAnalysis() {
+            if (!gen) return;
+            const text = JSON.stringify(gen.analysisArray, null, 2);
+            navigator.clipboard.writeText(text).then(() => log('📋 Copied all analysis data to clipboard'));
+        }
+
+        // ===== Stop Test =====
+        function stopTest() {
+            if (subscriptionId && ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ forget: subscriptionId }));
+                log('🛑 Unsubscribed from ticks');
+            }
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            subscriptionId = null;
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            setStatus('disconnected', 'Stopped');
+            log('■ Test stopped');
+        }
+
+        // ===== Status Badge =====
+        function setStatus(type, text) {
+            const el = document.getElementById('wsStatus');
+            el.textContent = text;
+            el.className = 'badge badge-' + type;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Multi-Asset Loader Demo</title>
+        <script src="https://cdn.jsdelivr.net/npm/gpu.js@latest/dist/gpu-browser.min.js"></script>
+        <style>
+            body {
+                font-family: "Courier New", monospace;
+                background: #0a0e27;
+                color: #00ff88;
+                padding: 20px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            h1 {
+                color: #4a9eff;
+            }
+            .controls {
+                background: #1a1f3a;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }
+            button {
+                background: #4a9eff;
+                color: #fff;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 16px;
+                margin: 5px;
+                font-weight: 600;
+            }
+            button:hover:not(:disabled) {
+                background: #357ab9;
+            }
+            button:disabled {
+                background: #666;
+                cursor: not-allowed;
+                opacity: 0.6;
+            }
+            .output {
+                background: #000;
+                padding: 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                line-height: 1.6;
+                margin: 20px 0;
+                max-height: 600px;
+                overflow-y: auto;
+            }
+            .success {
+                color: #00ff88;
+            }
+            .error {
+                color: #ff4444;
+            }
+            .info {
+                color: #4a9eff;
+            }
+            .warning {
+                color: #ff9500;
+            }
+            .gpu-status {
+                display: inline-block;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-weight: 600;
+                margin-left: 10px;
+            }
+            .gpu-status.gpu {
+                background: #00ff88;
+                color: #000;
+            }
+            .gpu-status.cpu {
+                background: #ff9500;
+                color: #000;
+            }
+            .gpu-status.loading {
+                background: #666;
+                color: #fff;
+            }
+            .gpu-status.error {
+                background: #ff4444;
+                color: #fff;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+            }
+            th,
+            td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #2a3654;
+            }
+            th {
+                background: #1a1f3a;
+                color: #4a9eff;
+                font-weight: 600;
+            }
+            tr:hover {
+                background: #1a2340;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>
+            🚀 Multi-Asset Loader Demo
+            <span class="gpu-status loading" id="gpuStatus">Loading...</span>
+        </h1>
+
+        <div class="controls">
+            <h3>Test Performance:</h3>
+            <div style="margin-bottom: 20px;">
+                <label style="cursor: pointer; font-size: 16px; color: #4a9eff; font-weight: bold; display: flex; align-items: center;">
+                    <input type="checkbox" id="superKernelCheck" style="width: 20px; height: 20px; margin-right: 10px;">
+                    🚀 Use Super Kernel (Batch Processing)
+                </label>
+            </div>
+            <button id="parallelBtn" disabled>
+                ⚡ Parallel Load (10 Assets) - FAST
+            </button>
+            <button id="sequentialBtn" disabled>
+                🐌 Sequential Load (10 Assets) - SLOW
+            </button>
+            <button id="compareBtn" disabled>📊 Compare Speed</button>
+            <button id="clearBtn" disabled>🗑️ Clear</button>
+        </div>
+
+        <div class="output" id="output">
+            <span class="info">Initializing...</span>
+        </div>
+
+        <div id="resultsTable"></div>
+
+        <script src="deriv-api.js"></script>
+        <script src="webgpu-indicators.js"></script>
+        <script src="multi-asset-loader.js"></script>
+
+        <script>
+            let derivAPI = null;
+            let indicators = null;
+            let multiLoader = null;
+            let isReady = false;
+
+            const output = document.getElementById("output");
+            const statusEl = document.getElementById("gpuStatus");
+            const parallelBtn = document.getElementById("parallelBtn");
+            const sequentialBtn = document.getElementById("sequentialBtn");
+            const compareBtn = document.getElementById("compareBtn");
+            const clearBtn = document.getElementById("clearBtn");
+            const superKernelCheck = document.getElementById("superKernelCheck");
+
+            function log(message, type = "info") {
+                const timestamp = new Date().toLocaleTimeString();
+                output.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+                output.scrollTop = output.scrollHeight;
+            }
+
+            function clear() {
+                output.innerHTML = "";
+            }
+
+            function setButtonsEnabled(enabled) {
+                parallelBtn.disabled = !enabled;
+                sequentialBtn.disabled = !enabled;
+                compareBtn.disabled = !enabled;
+                clearBtn.disabled = !enabled;
+            }
+
+            function updateStatus(mode, text) {
+                statusEl.textContent = text;
+                statusEl.className = "gpu-status " + mode;
+            }
+
+            async function init() {
+                clear();
+                log("Starting initialization...", "info");
+
+                try {
+                    // Step 1: Initialize WebGPUIndicators
+                    log("Initializing GPU indicators...", "info");
+                    indicators = new WebGPUIndicators();
+
+                    // Wait for GPU.js to be ready
+                    await indicators.ensureInitialized();
+
+                    const gpuStatus = indicators.getGPUStatus();
+                    updateStatus(gpuStatus.mode, gpuStatus.displayText);
+                    log(
+                        `GPU Status: ${gpuStatus.mode.toUpperCase()}`,
+                        "success",
+                    );
+
+                    // Step 2: Connect to Deriv API
+                    log("Connecting to Deriv API...", "info");
+                    derivAPI = new DerivAPI("1089");
+                    await derivAPI.connect();
+                    log("Connected to Deriv API", "success");
+
+                    // Step 3: Create MultiAssetLoader
+                    multiLoader = new MultiAssetLoader(derivAPI, indicators);
+                    log("Multi-Asset Loader ready!", "success");
+
+                    // Enable buttons
+                    isReady = true;
+                    setButtonsEnabled(true);
+                    log(
+                        "✅ Initialization complete! Click a button to start.",
+                        "success",
+                    );
+                } catch (error) {
+                    console.error("Initialization error:", error);
+                    log(`❌ Error: ${error.message}`, "error");
+                    updateStatus("error", "Init Failed");
+
+                    // Try to provide partial functionality if possible
+                    if (indicators && derivAPI && derivAPI.isConnected) {
+                        multiLoader = new MultiAssetLoader(
+                            derivAPI,
+                            indicators,
+                        );
+                        isReady = true;
+                        setButtonsEnabled(true);
+                        log(
+                            "⚠️ Partial initialization - some features may not work",
+                            "warning",
+                        );
+                    }
+                }
+            }
+
+            function checkReady() {
+                if (!isReady || !multiLoader) {
+                    log(
+                        "❌ System not ready. Please wait for initialization.",
+                        "error",
+                    );
+                    return false;
+                }
+                return true;
+            }
+
+            // Test Parallel Load
+            parallelBtn.addEventListener("click", async () => {
+                if (!checkReady()) return;
+
+                clear();
+                log("Starting PARALLEL load...", "info");
+                setButtonsEnabled(false);
+
+                const useSuperKernel = superKernelCheck.checked;
+                if (useSuperKernel) {
+                    log("🚀 Using SUPER KERNEL Batch Processing!", "success");
+                } else {
+                    log("💻 Using Standard Processing (Per-Asset)", "info");
+                }
+
+                const symbols = [
+                    "R_10",
+                    "R_25",
+                    "R_50",
+                    "R_75",
+                    "R_100",
+                    "1HZ10V",
+                    "1HZ25V",
+                    "1HZ50V",
+                    "1HZ75V",
+                    "1HZ100V",
+                ];
+
+                try {
+                    const startTime = performance.now();
+                    const result = await multiLoader.loadAndCalculate(
+                        symbols,
+                        60,
+                        500,
+                        "ema",
+                        useSuperKernel
+                    );
+                    const endTime = performance.now();
+
+                    if (result.success) {
+                        log(`✅ SUCCESS!`, "success");
+                        log(
+                            `⏱️  Total Time: ${(endTime - startTime).toFixed(2)}ms`,
+                            "success",
+                        );
+                        log(
+                            `📊 Loaded: ${result.stats.totalAssets} assets`,
+                            "success",
+                        );
+                        log(`🎮 GPU Mode: ${result.stats.gpuMode}`, "success");
+                        showResultsTable(result);
+                    } else {
+                        log(`❌ FAILED: ${result.error}`, "error");
+                    }
+                } catch (error) {
+                    log(`❌ Error: ${error.message}`, "error");
+                } finally {
+                    setButtonsEnabled(true);
+                }
+            });
+
+            // Test Sequential Load
+            sequentialBtn.addEventListener("click", async () => {
+                if (!checkReady()) return;
+
+                clear();
+                log("Starting SEQUENTIAL load (will be SLOW)...", "warning");
+                setButtonsEnabled(false);
+
+                const symbols = [
+                    "R_10",
+                    "R_25",
+                    "R_50",
+                    "R_75",
+                    "R_100",
+                    "1HZ10V",
+                    "1HZ25V",
+                    "1HZ50V",
+                    "1HZ75V",
+                    "1HZ100V",
+                ];
+
+                try {
+                    const startTime = performance.now();
+                    await multiLoader.loadMultipleAssetsSequential(
+                        symbols,
+                        60,
+                        500,
+                    );
+                    const endTime = performance.now();
+
+                    log(
+                        `⏱️  Total Time: ${(endTime - startTime).toFixed(2)}ms`,
+                        "warning",
+                    );
+                    log(`Note: Sequential is MUCH slower!`, "warning");
+                } catch (error) {
+                    log(`❌ Error: ${error.message}`, "error");
+                } finally {
+                    setButtonsEnabled(true);
+                }
+            });
+
+            // Compare Speed
+            compareBtn.addEventListener("click", async () => {
+                if (!checkReady()) return;
+
+                clear();
+                log("🏁 Starting Speed Comparison...", "info");
+                setButtonsEnabled(false);
+
+                const symbols = ["R_10", "R_25", "R_50", "R_75", "R_100"];
+                const useSuperKernel = superKernelCheck.checked;
+
+                try {
+                    // Test Parallel
+                    multiLoader.clear();
+                    log("Testing PARALLEL...", "info");
+                    const parallelStart = performance.now();
+                    await multiLoader.loadMultipleAssets(symbols, 60, 500);
+                    const parallelTime = performance.now() - parallelStart;
+                    log(`⚡ Parallel: ${parallelTime.toFixed(2)}ms`, "success");
+
+                    // Test Sequential
+                    multiLoader.clear();
+                    log("Testing SEQUENTIAL...", "info");
+                    const seqStart = performance.now();
+                    await multiLoader.loadMultipleAssetsSequential(
+                        symbols,
+                        60,
+                        500,
+                    );
+                    const seqTime = performance.now() - seqStart;
+                    log(`🐌 Sequential: ${seqTime.toFixed(2)}ms`, "warning");
+
+                    // Compare
+                    const speedup = (seqTime / parallelTime).toFixed(2);
+                    log(``, "info");
+                    log(`📊 RESULTS:`, "success");
+                    log(`Parallel is ${speedup}x FASTER!`, "success");
+                    log(
+                        `Time saved: ${(seqTime - parallelTime).toFixed(2)}ms`,
+                        "success",
+                    );
+                } catch (error) {
+                    log(`❌ Error: ${error.message}`, "error");
+                } finally {
+                    setButtonsEnabled(true);
+                }
+            });
+
+            // Clear
+            clearBtn.addEventListener("click", () => {
+                if (!checkReady()) return;
+
+                clear();
+                multiLoader.clear();
+                document.getElementById("resultsTable").innerHTML = "";
+                log("Cleared!", "info");
+            });
+
+            function showResultsTable(result) {
+                if (!result || !result.assets || !result.indicators) {
+                    return;
+                }
+
+                const rows = Object.keys(result.assets)
+                    .map((symbol) => {
+                        const asset = result.assets[symbol];
+                        const ind = result.indicators[symbol];
+
+                        if (!asset || !ind) return "";
+
+                        const lastClose =
+                            asset.closes && asset.closes.length > 0
+                                ? asset.closes[asset.closes.length - 1].toFixed(
+                                      4,
+                                  )
+                                : "N/A";
+                        const lastRSI =
+                            ind.rsi && ind.rsi.length > 0
+                                ? ind.rsi[ind.rsi.length - 1].toFixed(2)
+                                : "N/A";
+                        const lastChoppy =
+                            ind.choppy && ind.choppy.length > 0
+                                ? ind.choppy[ind.choppy.length - 1].toFixed(2)
+                                : "N/A";
+                        const candleCount = asset.candles
+                            ? asset.candles.length
+                            : 0;
+
+                        return `
+                        <tr>
+                            <td><strong>${symbol}</strong></td>
+                            <td>${candleCount}</td>
+                            <td>${lastClose}</td>
+                            <td>${lastRSI}</td>
+                            <td>${lastChoppy}</td>
+                        </tr>
+                    `;
+                    })
+                    .join("");
+
+                const tableHtml = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Candles</th>
+                                <th>Last Close</th>
+                                <th>RSI (last)</th>
+                                <th>Choppy (last)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById("resultsTable").innerHTML = tableHtml;
+            }
+
+            // Initialize on load
+            window.addEventListener("load", init);
+        </script>
+    </body>
+</html>

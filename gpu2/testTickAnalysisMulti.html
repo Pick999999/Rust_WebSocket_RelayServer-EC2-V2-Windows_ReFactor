@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Asset Tick Analysis</title>
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="js/clsAnalysisGenerator.js"></script>
+    <script src="js/clsAnalysisGeneratorTick.js"></script>
+
+    <script src="https://thepapers.in/phpAllPredictAPI/autoSaveInputs.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"
+        integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+
+
+    <script src="js/CodeColorMaster.js"></script>
+    <script src="js/trader.js"></script>
+
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 12px;
+        }
+
+        h1 {
+            font-size: 1.2em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .panel {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-size: 0.82em;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .cb-group label {
+            background: #1a1a2e;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #0f3460;
+            user-select: none;
+        }
+
+        .cb-group label:hover {
+            border-color: #667eea;
+        }
+
+        .cb-group input:checked+span {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+
+        button {
+            padding: 5px 14px;
+            border: none;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button.btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.78em;
+            font-weight: bold;
+        }
+
+        .badge-connected {
+            background: #1b5e20;
+            color: #4caf50;
+        }
+
+        .badge-disconnected {
+            background: #4a1010;
+            color: #f44336;
+        }
+
+        .badge-waiting {
+            background: #33301a;
+            color: #ff9800;
+        }
+
+        /* Summary Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78em;
+        }
+
+        th {
+            background: #0f3460;
+            color: #4fc3f7;
+            padding: 5px 6px;
+            text-align: center;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 4px 6px;
+            text-align: center;
+            border-bottom: 1px solid #1e2a3a;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: #1e2a3a;
+            cursor: pointer;
+        }
+
+        tr.selected {
+            background: #1a3a5c;
+        }
+
+        .green {
+            color: #4caf50;
+        }
+
+        .red {
+            color: #ef5350;
+        }
+
+        .yellow {
+            color: #ffeb3b;
+        }
+
+        .cyan {
+            color: #4fc3f7;
+        }
+
+        #chartContainer {
+            width: 100%;
+            height: 300px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #0f3460;
+        }
+
+        #chartTitle {
+            font-size: 0.9em;
+            color: #4fc3f7;
+            margin-bottom: 4px;
+        }
+
+        .table-scroll {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px;
+            background: #0d1117;
+            color: #c9d1d9;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 6px;
+            font-family: Consolas, monospace;
+            font-size: 0.72em;
+            resize: vertical;
+        }
+
+        #logArea {
+            height: 80px;
+            color: #8b949e;
+            font-size: 0.75em;
+        }
+
+        .section-title {
+            font-size: 0.85em;
+            color: #888;
+            margin: 6px 0 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input[type="number"],
+        select {
+            background: #0d1117;
+            color: #c9d1d9;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 0.8em;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        /* Tab Styles */
+        .tab-container {
+            width: 100%;
+        }
+
+        .tab-header {
+            display: flex;
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+            align-items: center;
+            /* Vertically center items */
+            padding-right: 10px;
+            /* Add some padding on the right */
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+        }
+
+        .panel-right-group {
+            margin-left: auto;
+            /* Push to the right */
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #panelClock {
+            font-family: 'Consolas', monospace;
+            color: #4fc3f7;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(79, 195, 247, 0.4);
+        }
+
+        #btnIdleTrade {
+            background-color: #4caf50;
+            /* Green by default */
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            font-size: 0.85em;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #btnIdleTrade:hover {
+            opacity: 0.9;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: #1e2a3a;
+            color: #d4d4d4;
+        }
+
+        .tab-btn.active {
+            background: #0f3460;
+            color: #4fc3f7;
+            border-bottom: 2px solid #4fc3f7;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 10px;
+            background: #1a1a2e;
+            /* Match body background or slightly different */
+            border: 1px solid #0f3460;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Analog Clock Styles */
+        .panel-with-clock {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .panel-controls {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .clock-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background: rgba(15, 52, 96, 0.35);
+            border: 1px solid rgba(79, 195, 247, 0.25);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 30px rgba(79, 195, 247, 0.05);
+            min-width: 170px;
+        }
+
+        .clock-container.visible {
+            display: flex;
+        }
+
+        #analogClock {
+            border-radius: 50%;
+            filter: drop-shadow(0 0 8px rgba(79, 195, 247, 0.3));
+        }
+
+        .clock-label {
+            font-size: 0.65em;
+            color: #4fc3f7;
+            margin-top: 4px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        .clock-digital {
+            font-size: 0.85em;
+            color: #e0e0e0;
+            font-family: 'Consolas', monospace;
+            margin-top: 2px;
+            text-shadow: 0 0 6px rgba(79, 195, 247, 0.5);
+        }
+
+        /* Trade Table Styles */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .contract-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8em;
+        }
+
+        .contract-table th {
+            background: #0f3460;
+            color: #4fc3f7;
+            padding: 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+
+        .contract-table td {
+            padding: 8px;
+            border-bottom: 1px solid #1e2a3a;
+            color: #d4d4d4;
+        }
+
+        .contract-table tr:hover {
+            background-color: #1e2a3a;
+        }
+
+        .contract-type {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85em;
+        }
+
+        .type-call {
+            background: rgba(38, 166, 154, 0.2);
+            color: #26a69a;
+            border: 1px solid #26a69a;
+        }
+
+        .type-put {
+            background: rgba(239, 83, 80, 0.2);
+            color: #ef5350;
+            border: 1px solid #ef5350;
+        }
+
+        .profit-positive {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .profit-negative {
+            color: #ef5350;
+            font-weight: bold;
+        }
+
+        .time-remaining {
+            font-family: 'Consolas', monospace;
+            color: #4fc3f7;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔬 Multi-Asset Tick Analysis (Incremental)</h1>
+    <!-- Controls -->
+    <div class="panel panel-with-clock">
+        <div class="panel-controls">
+            <div class="flex-row" style="margin-bottom:6px;">
+                <div class="cb-group flex-row"><label><input type="checkbox" class="cbAsset"
+                            value="R_10"><span>R_10</span></label><label><input type="checkbox" class="cbAsset"
+                            value="R_25"><span>R_25</span></label><label><input type="checkbox" class="cbAsset"
+                            value="R_50" checked><span>R_50</span></label><label><input type="checkbox" class="cbAsset"
+                            value="R_75"><span>R_75</span></label><label><input type="checkbox" class="cbAsset"
+                            value="R_100"><span>R_100</span></label><label><input type="checkbox" class="cbAsset"
+                            value="1HZ10V"><span>1HZ10V</span></label><label><input type="checkbox" class="cbAsset"
+                            value="1HZ25V"><span>1HZ25V</span></label><label><input type="checkbox" class="cbAsset"
+                            value="1HZ50V"><span>1HZ50V</span></label><label><input type="checkbox" class="cbAsset"
+                            value="1HZ75V"><span>1HZ75V</span></label><label><input type="checkbox" class="cbAsset"
+                            value="1HZ100V"><span>1HZ100V</span></label></div>
+            </div>
+
+            <!-- New System Settings -->
+            <div class="panel">
+                <div class="section-title">🛠️ System Settings</div>
+                <div class="control-group">
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="cbAutoReconnect" checked> 🔄 Auto Reconnect
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; margin-left:15px;">
+                        <input type="checkbox" id="cbAntiSleep" checked onchange="toggleAntiSleep(this.checked)"> ☕
+                        Prevent Sleep (WakeLock + Audio)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Signal Logic Config -->
+            <!-- Token Input -->
+            <div class="flex-row" style="margin-bottom:6px; border-bottom: 1px solid #1e2a3a; padding-bottom: 6px;">
+                <label for="inpToken" style="font-weight:bold; color:#ffeb3b;">🔑 API Token:</label>
+                <input type="password" id="inpToken" placeholder="Paste your Deriv API Token"
+                    style="background:#0d1117; border:1px solid #555; color:#fff; padding:4px; width:250px;"
+                    value='lt5UMO6bNvmZQaR'>
+            </div>
+            <div class="flex-row"><label>History: <select id="selCount">
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select></label><button id="btnStart" onclick="startAll()">▶ Start All</button><button id="btnStop"
+                    class="btn-danger" onclick="stopAll()" disabled>■ Stop</button>
+                <label style="margin-left:10px;"><input type="checkbox" id="cbShowMarkers" onchange="updateMarkers()">
+                    🏷️
+                    Show Markers</label>
+                <label style="margin-left:10px;"><input type="checkbox" id="cbPlaySound" checked>
+                    🔊 Sound</label>
+                <span id="wsStatus" class="badge badge-disconnected">Disconnected</span><span
+                    style="font-size:0.8em;color:#666;" id="loadProgress"></span>
+            </div>
+        </div>
+        <!-- Analog Clock (Right Side) -->
+        <div class="clock-container" id="clockContainer">
+            <canvas id="analogClock" width="140" height="140"></canvas>
+            <div class="clock-label">Thai Time</div>
+            <div class="clock-digital" id="clockDigital">--:--:--</div>
+        </div>
+    </div>
+    <!-- Configuration Panel -->
+    <!-- Trade Config Panel -->
+    <div class="panel">
+        <div class="section-title">💰 ⚙️ Trade Config</div>
+        <div id="tradeConfigPanel" style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="flex-row" style="align-items: flex-end; gap: 20px; flex-wrap: wrap;">
+                <!-- Signal PUT -->
+                <!-- Money Management & Settings -->
+                <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1;">
+                    <label style="font-size: 0.75em; color: #aaa; font-weight: bold;">Money Management</label>
+                    <div
+                        style="display: flex; flex-direction: row; gap: 16px; align-items: center; background: #0d1117; padding: 8px; border-radius: 6px; border: 1px solid #1e2a3a;">
+
+                        <!-- Fixed Money -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="radio" name="tradeType" id="fixedMoney" checked style="cursor: pointer;">
+                            <label for="fixedMoney" style="font-size: 0.85em; margin: 0; color: #d4d4d4;">Fixed</label>
+                            <input type="number" id="inpFixedMoney" placeholder="Amount" value="1"
+                                style="background: #16213e; border: 1px solid #4fc3f7; color: #fff; padding: 4px; border-radius: 4px; width: 70px; text-align: center;">
+                        </div>
+
+                        <div style="width: 1px; height: 20px; background: #1e2a3a;"></div>
+
+                        <!-- Martingale -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="radio" name="tradeType" id="martinGale" style="cursor: pointer;">
+                            <label for="martinGale"
+                                style="font-size: 0.85em; margin: 0; color: #d4d4d4;">Martingale</label>
+                            <input type="text" id="martinGaleMoneyTrade" placeholder="Steps" value="1,2,6,18,54,162"
+                                style="background: #16213e; border: 1px solid #ff9800; color: #fff; padding: 4px; border-radius: 4px; width: 140px; text-align: center;">
+                        </div>
+
+                        <div style="width: 1px; height: 20px; background: #1e2a3a;"></div>
+
+                        <!-- Trade All Assets -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="checkbox" id="isTradeAllAssetSelected" style="cursor: pointer;">
+                            <label for="isTradeAllAssetSelected"
+                                style="font-size: 0.85em; margin: 0; color: #4caf50; cursor: pointer;">All
+                                Assets?</label>
+                        </div>
+
+                        <!-- Duration -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+
+                            <label for="martinGale" style="font-size: 0.85em; margin: 0; color: #d4d4d4;">⏰
+                                Duration</label>
+                            <input type="text" id="numDuration" placeholder="Steps" value="55"
+                                style="background: #16213e; border: 1px solid #ff9800; color: #fff; padding: 4px; border-radius: 4px; width: 140px; text-align: center;">
+                        </div>
+                        <!-- Duration Unit -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+
+                            <label for="martinGale" style="font-size: 0.85em; margin: 0; color: #d4d4d4;">🗓️
+                                Duration
+                                Unit</label>
+                            <select id="durationUnit">
+                                <option value="s" selected>Seconds
+                                <option value="m">Minute
+                                <option value="h">Hour
+
+                            </select>
+
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Signal PUT -->
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label for="signalPut" style="font-size: 0.75em; color: #ef5350; font-weight: bold;">📉 🔴
+                        Signal to
+                        PUT</label>
+                    <input type="text" id="signalPut" placeholder="e.g. S-D-R"
+                        style="background: #0d1117; border: 1px solid #ef5350; color: #ef5350; padding: 6px; border-radius: 4px; width: 140px; text-align: center;">
+                </div>
+
+                <!-- Signal CALL -->
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label for="signalCall" style="font-size: 0.75em; color: #4caf50; font-weight: bold;">📈 🟢
+                        Signal
+                        to
+                        CALL</label>
+                    <input type="text" id="signalCall" placeholder="e.g. B-U-G"
+                        style="background: #0d1117; border: 1px solid #4caf50; color: #4caf50; padding: 6px; border-radius: 4px; width: 140px; text-align: center;">
+                </div>
+
+                <!-- Action Button -->
+                <div style="margin-left: auto;">
+                    <button type="button" id="btnStartTrade" class="mBtn"
+                        style="padding: 8px 24px; font-size: 0.95em; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">🚀
+                        Start
+                        Trade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Summary Table -->
+    <div class="panel">
+        <div class="section-title">📊 Asset Summary (click row to view chart)</div>
+        <div class="table-scroll">
+            <table id="summaryTable">
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Price</th>
+                        <th>Candles</th>
+                        <th>Ticks</th>
+                        <th>EMA7</th>
+                        <th>EMA25</th>
+                        <th>EMA99</th>
+                        <th>Direction</th>
+                        <th>RSI</th>
+                        <th>ADX</th>
+                        <th>CI</th>
+                        <th>BB Pos</th>
+                        <th>Trend</th>
+                        <th>Last Update</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <!-- Chart -->
+    <div class="panel">
+        <div id="chartTitle">📈 Select an asset from the table above</div>
+        <div id="chartContainer"></div>
+    </div>
+    <!-- Log+Analysis -->
+    <!-- Tabs -->
+    <div class="tab-container">
+        <div class="tab-header">
+            <button class="tab-btn active" onclick="openTab(event, 'tabLog')">📋 Log & Analysis</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab2')">Tab 2</button>
+            <button class="tab-btn" onclick="openTab(event, 'tab3')">Tab 3</button>
+
+            <div class="panel-right-group">
+                <input type="number" id="inpTargetProfit" placeholder="Target Profit"
+                    style="width:90px; background:#0d1117; border:1px solid #4fc3f7; color:#fff; padding:4px; border-radius:4px; text-align:center;"
+                    title="Target Profit (Session Gain)">
+                <span style="font-size:0.85em; color:#aaa;">Profit: <span id="lblBalance"
+                        style="color:#fff; font-weight:bold;">0.00</span></span>
+                <button id="btnIdleTrade" onclick="if(typeof DerivTrader !== 'undefined') DerivTrader.toggleIdle()">⏸️
+                    Idle Trade</button>
+                <div id="panelClock">--:--:--</div>
+            </div>
+        </div>
+
+        <div id="tabLog" class="tab-content active">
+            <!-- Configuration Panel (Moved) -->
+            <div class="panel" style="margin-top:0; border:none; padding:0; background:transparent;">
+                <div class="section-title" style="cursor:pointer;" onclick="toggleConfig()"><span>⚙️
+                        Configuration</span><span id="configToggleIcon">▼</span></div>
+                <div id="configPanel" class="flex-row" style="align-items:flex-end; gap:12px; flex-wrap:wrap;">
+                    <!-- EMA 1 -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">EMA 1</div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpEma1Period" value="7"
+                                style="width:45px;" title="EMA1 Period"><select id="selEma1Type" title="EMA1 Type">
+                                <option value="EMA">EMA</option>
+                                <option value="SMA">SMA</option>
+                                <option value="HMA">HMA</option>
+                                <option value="EHMA">EHMA</option>
+                                <option value="WMA">WMA</option>
+                            </select></div>
+                    </div>
+                    <!-- EMA 2 -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">EMA 2</div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpEma2Period" value="25"
+                                style="width:45px;" title="EMA2 Period"><select id="selEma2Type" title="EMA2 Type">
+                                <option value="EMA">EMA</option>
+                                <option value="SMA">SMA</option>
+                                <option value="HMA">HMA</option>
+                                <option value="EHMA">EHMA</option>
+                                <option value="WMA">WMA</option>
+                            </select></div>
+                    </div>
+                    <!-- EMA 3 -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">EMA 3</div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpEma3Period" value="99"
+                                style="width:45px;" title="EMA3 Period"><select id="selEma3Type" title="EMA3 Type">
+                                <option value="EMA">EMA</option>
+                                <option value="SMA">SMA</option>
+                                <option value="HMA">HMA</option>
+                                <option value="EHMA">EHMA</option>
+                                <option value="WMA">WMA</option>
+                            </select></div>
+                    </div>
+                    <!-- ATR -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">ATR (P/M)</div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpAtrPeriod" value="14"
+                                style="width:45px;" title="ATR Period"><input type="number" id="inpAtrMult" value="2"
+                                step="0.5" style="width:40px;" title="ATR Multiplier"></div>
+                    </div>
+                    <!-- Periods -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">BB/CI/ADX/RSI
+                        </div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpBbPeriod" value="20"
+                                style="width:40px;" title="BB Period"><input type="number" id="inpCiPeriod" value="14"
+                                style="width:40px;" title="CI Period"><input type="number" id="inpAdxPeriod" value="14"
+                                style="width:40px;" title="ADX Period"><input type="number" id="inpRsiPeriod" value="14"
+                                style="width:40px;" title="RSI Period">
+                        </div>
+                    </div>
+                    <!-- Thresholds -->
+                    <div>
+                        <div style="font-size:0.7em;color:#888;margin-bottom:2px;">Thr
+                            (Flat/Macd)</div>
+                        <div class="flex-row" style="gap:4px;"><input type="number" id="inpFlat" value="0.0001"
+                                step="0.0001" style="width:65px;" title="Flat Threshold"><input type="number"
+                                id="inpMacd" value="0.15" step="0.01" style="width:45px;" title="MACD Narrow"></div>
+                    </div>
+                </div>
+            </div>
+            <hr style="border:0; border-top:1px solid #1e2a3a; margin:10px 0;">
+
+            <div class="section-title">📋 Log</div>
+            <textarea id="logArea" readonly></textarea>
+
+            <div class="section-title">📊 Analysis (Selected Asset - Last 3)
+                <button onclick="copyAnalysis()" style="font-size:0.75em;padding:2px 8px;">📋 Copy All</button>
+            </div>
+            <textarea id="analysisArea" readonly></textarea>
+
+            <div id="CodeCandleInfo" class="bordergray flex">CodeCandleInfo</div>
+            <textarea id="CodeCandleMaster" readonly></textarea>
+        </div>
+
+        <div id="tab2" class="tab-content">
+            <!-- Content for Tab 2 -->
+            <div class="panel">
+                <div class="section-title">📜 Active Trades</div>
+                <div class="table-wrapper">
+                    <table class="contract-table">
+                        <thead>
+                            <tr>
+                                <th>No.</th>
+                                <th>Contract ID</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Buy Price</th>
+                                <th>Payout</th>
+                                <th>Buy Time</th>
+                                <th>Expiry</th>
+                                <th>Remaining</th>
+                                <th>Min Profit</th>
+                                <th>Max Profit</th>
+                                <th>Profit</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contractsTableBody">
+                            <!-- Rows will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab3" class="tab-content">
+            <!-- Content for Tab 3 -->
+            <p style="text-align:center; color:#666;">Tab 3 Content</p>
+        </div>
+    </div>
+
+
+    <script>
+	    const APP_ID = 1089;
+		var GEN_OPTIONS = null ;
+
+        /*GEN_OPTIONS = {
+            ema1Period: 7, ema1Type: 'EMA', ema2Period: 25, ema2Type: 'EMA',
+            ema3Period: 99, ema3Type: 'EMA', atrPeriod: 14, atrMultiplier: 2,
+            bbPeriod: 20, ciPeriod: 14, adxPeriod: 14, rsiPeriod: 14,
+            flatThreshold: 0.0001, macdNarrow: 0.15
+        }
+		*/
+
+            ;
+
+        let runtimeOptions = {
+            ...GEN_OPTIONS
+        }
+
+            ;
+
+        // ===== Per-Asset State =====
+        // assets = { symbol: { gen, currentCandle, tickCount, subscriptionId, candleHistory } }
+        const assets = {}
+
+            ;
+        let ws = null;
+        let reqIdCounter = 1000;
+        let reqIdMap = {};
+        let selectedAsset = null;
+        let ColorCodeMaster = [];
+
+        function openTab(evt, tabName) {
+            // Hide all tab contents
+            const contents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < contents.length; i++) {
+                contents[i].classList.remove("active");
+                contents[i].style.display = "none";
+            }
+            // Deactivate all buttons
+            const buttons = document.getElementsByClassName("tab-btn");
+            for (let i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove("active");
+            }
+            // Show current tab and activate button
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.classList.add("active");
+        }
+
+        function toggleConfig() {
+            const p = document.getElementById('configPanel');
+            const i = document.getElementById('configToggleIcon');
+
+            if (p.style.display === 'none') {
+                p.style.display = 'flex';
+                i.textContent = '▼';
+            }
+
+            else {
+                p.style.display = 'none';
+                i.textContent = '▲';
+            }
+        }
+
+        // Chart
+        let chart = null,
+            candleSeries = null;
+        let ema1Line = null,
+            ema2Line = null,
+            ema3Line = null;
+
+        function log(msg) {
+            const a = document.getElementById('logArea');
+
+            a.value = `[${new Date().toLocaleTimeString('th-TH')}] ${msg}\n` + a.value;
+            if (a.value.length > 8000) a.value = a.value.substring(0, 8000);
+        }
+
+        function setStatus(type, text) {
+            const el = document.getElementById('wsStatus');
+            el.textContent = text;
+            el.className = 'badge badge-' + type;
+        }
+
+        // ===== Init Chart =====
+        function initChart() {
+            if (chart) return;
+            const c = document.getElementById('chartContainer');
+
+            chart = LightweightCharts.createChart(c, {
+
+                width: c.clientWidth, height: 300,
+                layout: {
+                    background: {
+                        type: 'solid', color: '#1a1a2e'
+                    }
+
+                    , textColor: '#d4d4d4'
+                }
+
+                ,
+                grid: {
+                    vertLines: {
+                        color: '#1e2a3a'
+                    }
+
+                    , horzLines: {
+                        color: '#1e2a3a'
+                    }
+                }
+
+                ,
+                rightPriceScale: {
+                    borderColor: '#0f3460'
+                }
+
+                ,
+                timeScale: {
+                    borderColor: '#0f3460', timeVisible: true, secondsVisible: false
+                }
+
+                ,
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            });
+
+            ema1Line = chart.addLineSeries({
+                color: '#ffeb3b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false
+            });
+
+            ema2Line = chart.addLineSeries({
+                color: '#2196f3', lineWidth: 1, priceLineVisible: false, lastValueVisible: false
+            });
+
+            ema3Line = chart.addLineSeries({
+                color: '#e91e63', lineWidth: 1, priceLineVisible: false, lastValueVisible: false
+            });
+
+            new ResizeObserver(e => {
+                if (e[0]) chart.applyOptions({
+                    width: e[0].contentRect.width
+                });
+            }).observe(c);
+        }
+
+        // ===== Show Asset on Chart =====
+        function showAssetChart(symbol) {
+            selectedAsset = symbol;
+            const a = assets[symbol];
+            if (!a || !a.gen) return;
+
+            document.getElementById('chartTitle').textContent = `📈 ${symbol}`;
+
+            // Candle data
+            candleSeries.setData(a.gen.candleData);
+
+            // EMA lines
+            const e1 = [],
+                e2 = [],
+                e3 = [];
+
+            a.gen.analysisArray.forEach(x => {
+                if (x.emaShortValue != null) e1.push({
+                    time: x.candletime, value: x.emaShortValue
+                });
+
+                if (x.emaMediumValue != null) e2.push({
+                    time: x.candletime, value: x.emaMediumValue
+                });
+
+                if (x.emaLongValue != null) e3.push({
+                    time: x.candletime, value: x.emaLongValue
+                });
+            });
+            ema1Line.setData(e1);
+            ema2Line.setData(e2);
+            ema3Line.setData(e3);
+            chart.timeScale().fitContent();
+
+            // Highlight row
+            document.querySelectorAll('#summaryBody tr').forEach(r => r.classList.toggle('selected', r.dataset.symbol === symbol));
+
+            // Update analysis textarea
+            updateAnalysisArea();
+            updateMarkers();
+        }
+
+        function updateMarkers() {
+            if (!selectedAsset) return;
+            const a = assets[selectedAsset];
+            if (!a || !a.gen || !candleSeries) return;
+
+            const show = document.getElementById('cbShowMarkers').checked;
+
+            if (!show) {
+                candleSeries.setMarkers([]);
+                return;
+            }
+
+            const markers = [];
+            a.gen.analysisArray.forEach(x => {
+                if (x.StatusCode && x.StatusCode !== '') {
+                    // Simple heuristic for marker style
+                    let color = '#ffffff';
+                    let position = 'aboveBar';
+                    let shape = 'arrowDown';
+
+                    // Adjust based on common signal codes if known
+                    // Set marker based on emaMediumDirection
+                    if (x.emaMediumDirection === 'Up') {
+                        color = '#00ff00';
+                        position = 'belowBar';
+                        shape = 'arrowUp';
+                    } else if (x.emaMediumDirection === 'Down') {
+                        color = '#ff0000';
+                        position = 'aboveBar';
+                        shape = 'arrowDown';
+                    } else {
+                        // Neutral or unknown, fallback to a neutral color circle
+                        color = '#aaaaaa';
+                        position = 'aboveBar';
+                        shape = 'circle';
+                    }
+
+                    markers.push({
+                        time: x.candletime,
+                        position: position,
+                        color: color,
+                        shape: shape,
+                        text: String(x.StatusCode)
+                    });
+                }
+            });
+            candleSeries.setMarkers(markers);
+        }
+
+        // ===== Update Summary Row =====
+        function updateSummaryRow(symbol) {
+            const a = assets[symbol];
+            if (!a || !a.gen || a.gen.analysisArray.length === 0) return;
+            const last = a.gen.analysisArray[a.gen.analysisArray.length - 1];
+
+            let row = document.getElementById('row_' + symbol);
+
+            if (!row) {
+                row = document.createElement('tr');
+                row.id = 'row_' + symbol;
+                row.dataset.symbol = symbol;
+                row.onclick = () => showAssetChart(symbol);
+                document.getElementById('summaryBody').appendChild(row);
+            }
+
+            const dirClass = last.emaMediumDirection === 'Up' ? 'green' : (last.emaMediumDirection === 'Down' ? 'red' : '');
+            const rsiClass = last.rsiValue > 70 ? 'red' : (last.rsiValue < 30 ? 'green' : '');
+            const trendLabel = last.emaLongAbove === 'MediumAbove' ? '🟢 Bull' : '🔴 Bear';
+
+            row.innerHTML = `
+                <td><b>${symbol}</b></td>
+                <td>${last.close}</td>
+                <td>${a.gen.analysisArray.length}</td>
+                <td>${a.tickCount}</td>
+                <td>${last.emaShortValue || '-'}</td>
+                <td>${last.emaMediumValue || '-'}</td>
+                <td>${last.emaLongValue || '-'}</td>
+                <td class="${dirClass}">${last.emaMediumDirection}/${last.emaLongDirection}</td>
+                <td class="${rsiClass}">${last.rsiValue || '-'}</td>
+                <td>${last.adxValue || '-'}</td>
+                <td>${last.choppyIndicator || '-'}</td>
+                <td>${last.bbPosition || '-'}</td>
+                <td>${trendLabel}</td>
+                <td>${new Date().toLocaleTimeString('th-TH')}</td>
+            `;
+        }
+
+        function updateAnalysisArea() {
+            if (!selectedAsset || !assets[selectedAsset]) return;
+            const arr = assets[selectedAsset].gen?.analysisArray;
+            if (!arr) return;
+            document.getElementById('analysisArea').value = JSON.stringify(arr.slice(-3), null, 2);
+        }
+
+        function copyAnalysis() {
+            if (!selectedAsset || !assets[selectedAsset]?.gen) return;
+
+            navigator.clipboard.writeText(JSON.stringify(assets[selectedAsset].gen.analysisArray, null, 2)).then(() => log(`📋 Copied ${selectedAsset} analysis`));
+        }
+
+        // ===== Start All =====
+        async function startAll() {
+            isManualStop = false; // Reset manual stop flag
+            const checked = [...document.querySelectorAll('.cbAsset:checked')].map(c => c.value);
+
+            if (checked.length === 0) {
+                alert('เลือก asset อย่างน้อย 1 ตัว');
+                return;
+            }
+
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+
+            // Update runtimeOptions from inputs
+            runtimeOptions = {
+                ema1Period: parseInt(document.getElementById('inpEma1Period').value) || 7,
+                ema1Type: document.getElementById('selEma1Type').value,
+                ema2Period: parseInt(document.getElementById('inpEma2Period').value) || 25,
+                ema2Type: document.getElementById('selEma2Type').value,
+                ema3Period: parseInt(document.getElementById('inpEma3Period').value) || 99,
+                ema3Type: document.getElementById('selEma3Type').value,
+                atrPeriod: parseInt(document.getElementById('inpAtrPeriod').value) || 14,
+                atrMultiplier: parseFloat(document.getElementById('inpAtrMult').value) || 2,
+                bbPeriod: parseInt(document.getElementById('inpBbPeriod').value) || 20,
+                ciPeriod: parseInt(document.getElementById('inpCiPeriod').value) || 14,
+                adxPeriod: parseInt(document.getElementById('inpAdxPeriod').value) || 14,
+                rsiPeriod: parseInt(document.getElementById('inpRsiPeriod').value) || 14,
+                flatThreshold: parseFloat(document.getElementById('inpFlat').value) || 0.0001,
+                macdNarrow: parseFloat(document.getElementById('inpMacd').value) || 0.15
+            }
+
+                ;
+            log('Starting with options: ' + JSON.stringify(runtimeOptions));
+
+            initChart();
+
+            // Init per-asset state
+            checked.forEach(s => {
+                assets[s] = {
+                    gen: null, currentCandle: null, tickCount: 0, subscriptionId: null, candleHistory: []
+                }
+
+                    ;
+            });
+
+            log(`Starting ${checked.length} assets: ${checked.join(', ')}`);
+            setStatus('waiting', 'Connecting...');
+
+            ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${APP_ID}`);
+
+            ws.onopen = () => {
+                log('✅ Connected');
+                setStatus('connected', 'Connected');
+                const count = parseInt(document.getElementById('selCount').value);
+
+                // Request server time
+                ws.send(JSON.stringify({ time: 1 }));
+
+                // === 1. Auto Re-subscribe to previously selected assets ===
+                // If this is a reconnection, 'checked' array holds the assets we want.
+                // If it's a fresh start, it also holds them.
+
+                // Request candle history for each asset
+                checked.forEach(symbol => {
+                    // Update state if needed or just re-request
+                    const reqId = reqIdCounter++;
+                    reqIdMap[reqId] = symbol;
+
+                    ws.send(JSON.stringify({
+                        ticks_history: symbol, adjust_start_time: 1,
+                        count: count, end: "latest", style: "candles",
+                        granularity: 60, req_id: reqId
+                    }));
+                });
+
+                // Request Balance Subscription
+                ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+
+                // Subscribe to tick stream for each asset
+                checked.forEach(symbol => {
+                    ws.send(JSON.stringify({
+                        ticks_history: symbol, adjust_start_time: 1,
+                        count: 0, end: "latest", style: "ticks", subscribe: 1
+                    }));
+                });
+
+                // Start Anti-Sleep if enabled
+                toggleAntiSleep(document.getElementById('cbAntiSleep').checked);
+            };
+
+            ws.onmessage = (evt) => handleMessage(JSON.parse(evt.data));
+
+            ws.onerror = () => {
+                log('❌ Error');
+                setStatus('disconnected', 'Error');
+            };
+
+            ws.onclose = () => {
+                log('⚠️ Connection Closed');
+                setStatus('disconnected', 'Disconnected');
+                stopClock();
+
+                // Auto Reconnect Logic
+                if (document.getElementById('cbAutoReconnect').checked) {
+                    log('🔄 Auto Reconnecting in 3s...');
+                    setTimeout(() => {
+                        // Only reconnect if we were supposed to be running (Start button disabled)
+                        // Or just force it if the user wants auto-reconnect.
+                        // We reuse startAll() but need coverage for arguments. 
+                        // startAll reads UI state, so it's safe to call directly.
+                        if (!document.getElementById('btnStart').disabled) {
+                            // If button is enabled, it means we stopped manually? 
+                            // No, onclose happened. We should assume we want to continue.
+                            // But startAll disables the button. 
+                            // Let's check if the USER pressed STOP. 
+                            // If user pressed STOP, we set a flag 'isManualStop'.
+                        }
+                        if (!isManualStop) {
+                            startAll();
+                        }
+                    }, 3000);
+                }
+            };
+        }
+
+        let isManualStop = false;
+
+        // Anti-Sleep Logic
+        let wakeLock = null;
+        let silentAudio = null;
+
+        async function toggleAntiSleep(enable) {
+            if (enable) {
+                // 1. Wake Lock API
+                if ('wakeLock' in navigator) {
+                    try {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        log('💡 Screen Wake Lock active');
+                    } catch (err) {
+                        console.warn('Wake Lock error:', err);
+                    }
+                }
+
+                // 2. Silent Audio Loop (Fallback for throttling)
+                if (!silentAudio) {
+                    silentAudio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAP9MYXZjNTguNTQuMTAwAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjU0LjEwMAAAAAAAAAAA");
+                    silentAudio.loop = true;
+                    silentAudio.volume = 0.01;
+                }
+                silentAudio.play().catch(() => log('⚠️ Auto-play blocked. Interact with page to enable anti-sleep audio.'));
+
+            } else {
+                if (wakeLock) {
+                    wakeLock.release().then(() => wakeLock = null);
+                    log('zzz Wake Lock released');
+                }
+                if (silentAudio) {
+                    silentAudio.pause();
+                }
+            }
+        }
+
+        // ===== Handle Messages =====
+        function handleMessage(data) {
+
+            // Pass to DerivTrader for trade updates
+            if (typeof DerivTrader !== 'undefined' && DerivTrader.handleMessage) {
+                DerivTrader.handleMessage({ data: JSON.stringify(data) });
+            }
+
+            // 0. Time response - start the analog clock
+            if (data.time) {
+                initServerClock(data.time);
+            }
+
+            // 1. Candle History
+            if (data.candles && data.req_id && reqIdMap[data.req_id]) {
+                const symbol = reqIdMap[data.req_id];
+                const a = assets[symbol];
+                if (!a) return;
+
+                a.candleHistory = data.candles.map(c => ({
+                    time: c.epoch, open: parseFloat(c.open),
+                    high: parseFloat(c.high), low: parseFloat(c.low), close: parseFloat(c.close)
+                }));
+
+                console.log('runtimeOptions',runtimeOptions) ;
+                
+                a.gen = new AnalysisGeneratorTick(a.candleHistory, runtimeOptions);
+                const t0 = performance.now();
+                a.gen.generate();
+                const t1 = performance.now();
+
+                log(`📊 ${symbol}: ${a.candleHistory.length} candles, generate() ${(t1 - t0).toFixed(1)}ms`);
+                updateSummaryRow(symbol);
+
+                // Auto-show first asset
+                if (!selectedAsset) showAssetChart(symbol);
+
+                const loaded = Object.values(assets).filter(x => x.gen).length;
+                const total = Object.keys(assets).length;
+
+                document.getElementById('loadProgress').textContent = `Loaded: ${loaded}/${total}`;
+            }
+
+            // 2. Tick Stream
+            if (data.tick && data.tick.symbol && assets[data.tick.symbol]) {
+                const symbol = data.tick.symbol;
+                const price = parseFloat(data.tick.quote);
+                const time = data.tick.epoch;
+                const a = assets[symbol];
+
+                if (!a.subscriptionId) a.subscriptionId = data.tick.id;
+                a.tickCount++;
+
+                // Append tick (AnalysisGeneratorTick handles candle aggregation)
+                const completedCandle = a.gen.appendTick(price, time);
+
+                // Update Real-time Chart (Current forming candle)
+                if (symbol === selectedAsset && candleSeries) {
+                    const cur = a.gen.currentCandle;
+                    if (cur && cur.time) {
+                        candleSeries.update({
+                            time: cur.time,
+                            open: cur.open,
+                            high: cur.high,
+                            low: cur.low,
+                            close: cur.close
+                        });
+                    }
+                }
+
+                // If a candle completed
+                if (completedCandle) {
+
+                    // Log info
+                    log(`🕐 ${symbol} New Candle | RSI=${completedCandle.rsiValue} CI=${completedCandle.choppyIndicator}`);
+                    updateSummaryRow(symbol);
+
+                    // Check for Trade Entry
+                    if (typeof DerivTrader !== 'undefined' && DerivTrader.checkEntry) {
+                        try {
+                            DerivTrader.checkEntry(symbol, completedCandle);
+                        } catch (e) { console.error('CheckEntry Error:', e); }
+                    }
+
+                    if (selectedAsset === symbol) {
+                        showAssetChart(symbol);
+                        updateMarkers();
+                    }
+                }
+            }
+        }
+
+        // ===== Analog Clock =====
+        let clockAnimId = null;
+        let serverTimeOffset = 0; // offset = serverEpoch - localEpoch
+
+        function initServerClock(serverEpoch) {
+            const localEpoch = Math.floor(Date.now() / 1000);
+            serverTimeOffset = serverEpoch - localEpoch;
+            log(`🕐 Server time received. Offset: ${serverTimeOffset}s`);
+
+            // Show clock container
+            document.getElementById('clockContainer').classList.add('visible');
+
+            // Start animation loop if not already running
+            if (!clockAnimId) {
+                drawClockLoop();
+            }
+        }
+
+        function stopClock() {
+            if (clockAnimId) {
+                cancelAnimationFrame(clockAnimId);
+                clockAnimId = null;
+            }
+            document.getElementById('clockContainer').classList.remove('visible');
+        }
+
+        function getServerDate() {
+            const nowMs = Date.now() + serverTimeOffset * 1000;
+            // Create a date object, but we want to display Thai Time (UTC+7)
+            // The Date object methods like getHours() return local system time, 
+            // getUTCHours() return UTC.
+            // We want to force the analog clock to show UTC+7.
+            // Method: Add 7 hours to the UTC timestamp, then read as UTC.
+            const thaiOffsetMs = 7 * 60 * 60 * 1000;
+            return new Date(nowMs + thaiOffsetMs);
+        }
+
+        function drawClockLoop() {
+            drawAnalogClock();
+            clockAnimId = requestAnimationFrame(drawClockLoop);
+        }
+
+        function drawAnalogClock() {
+            const canvas = document.getElementById('analogClock');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const cx = W / 2;
+            const cy = H / 2;
+            const R = Math.min(cx, cy) - 6;
+
+            const now = getServerDate();
+            const hours = now.getUTCHours();
+            const minutes = now.getUTCMinutes();
+            const seconds = now.getUTCSeconds();
+            const millis = now.getUTCMilliseconds();
+
+            // Smooth second hand
+            const secAngle = ((seconds + millis / 1000) / 60) * Math.PI * 2 - Math.PI / 2;
+            const minAngle = ((minutes + seconds / 60) / 60) * Math.PI * 2 - Math.PI / 2;
+            const hrAngle = (((hours % 12) + minutes / 60) / 12) * Math.PI * 2 - Math.PI / 2;
+
+            // Clear
+            ctx.clearRect(0, 0, W, H);
+
+            // ---- Face background (dark gradient) ----
+            const faceGrad = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
+            faceGrad.addColorStop(0, '#1e2a3a');
+            faceGrad.addColorStop(0.85, '#16213e');
+            faceGrad.addColorStop(1, '#0f3460');
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, 0, Math.PI * 2);
+            ctx.fillStyle = faceGrad;
+            ctx.fill();
+
+            // ---- Outer ring ----
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(79, 195, 247, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // ---- Inner subtle ring ----
+            ctx.beginPath();
+            ctx.arc(cx, cy, R - 4, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(79, 195, 247, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // ---- Hour tick marks ----
+            for (let i = 0; i < 60; i++) {
+                const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+                const isHour = i % 5 === 0;
+                const outerR = R - 6;
+                const innerR = isHour ? R - 18 : R - 12;
+                const x1 = cx + Math.cos(angle) * outerR;
+                const y1 = cy + Math.sin(angle) * outerR;
+                const x2 = cx + Math.cos(angle) * innerR;
+                const y2 = cy + Math.sin(angle) * innerR;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = isHour ? '#4fc3f7' : 'rgba(79, 195, 247, 0.3)';
+                ctx.lineWidth = isHour ? 2 : 1;
+                ctx.stroke();
+            }
+
+            // ---- Hour numbers ----
+            ctx.font = 'bold 11px Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#8b9dc3';
+            for (let i = 1; i <= 12; i++) {
+                const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                const numR = R - 26;
+                const nx = cx + Math.cos(angle) * numR;
+                const ny = cy + Math.sin(angle) * numR;
+                ctx.fillText(i.toString(), nx, ny);
+            }
+
+            // ---- Hour hand ----
+            ctx.save();
+            ctx.shadowColor = 'rgba(79, 195, 247, 0.6)';
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(hrAngle) * (R * 0.45), cy + Math.sin(hrAngle) * (R * 0.45));
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 3.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            // ---- Minute hand ----
+            ctx.save();
+            ctx.shadowColor = 'rgba(79, 195, 247, 0.5)';
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(minAngle) * (R * 0.65), cy + Math.sin(minAngle) * (R * 0.65));
+            ctx.strokeStyle = '#c9d1d9';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            // ---- Second hand ----
+            ctx.save();
+            ctx.shadowColor = 'rgba(239, 83, 80, 0.8)';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            // Tail
+            ctx.moveTo(cx - Math.cos(secAngle) * (R * 0.15), cy - Math.sin(secAngle) * (R * 0.15));
+            ctx.lineTo(cx + Math.cos(secAngle) * (R * 0.72), cy + Math.sin(secAngle) * (R * 0.72));
+            ctx.strokeStyle = '#ef5350';
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+
+            // ---- Center dot ----
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef5350';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+
+            // ---- "Thai Time" label on face ----
+            ctx.font = '8px Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(79, 195, 247, 0.6)';
+            ctx.fillText('UTC+7', cx, cy + R * 0.32);
+
+            // ---- Update digital display (Clock Face) ----
+            const digi = document.getElementById('clockDigital');
+            if (digi) {
+                const hh = String(hours).padStart(2, '0');
+                const mm = String(minutes).padStart(2, '0');
+                const ss = String(seconds).padStart(2, '0');
+                digi.textContent = `${hh}:${mm}:${ss}`;
+            }
+
+            // ---- Update Panel Digital Clock ----
+            const panelClock = document.getElementById('panelClock');
+            if (panelClock) {
+                const hh = String(hours).padStart(2, '0');
+                const mm = String(minutes).padStart(2, '0');
+                const ss = String(seconds).padStart(2, '0');
+                panelClock.textContent = `${hh}:${mm}:${ss} UTC+7`;
+            }
+        }
+
+        // ===== Stop =====
+        function stopAll() {
+            isManualStop = true; // Mark as user-initiated stop
+            Object.values(assets).forEach(a => {
+                if (a.subscriptionId && ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({
+                        forget: a.subscriptionId
+                    }));
+                }
+            });
+            // Forget Balance as well ideally, or just close
+            if (ws) {
+                ws.close(); ws = null;
+            }
+
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            setStatus('disconnected', 'Disconnected');
+            stopClock();
+        }
+
+        let initialBalance = null;
+
+        function handleBalanceUpdate(balanceObj) {
+            // We ignore balance updates for the Profit Label now, 
+            // but we might want to store initialBalance or currentBalance for debugging.
+            const currentBalance = parseFloat(balanceObj.balance);
+            if (initialBalance === null) initialBalance = currentBalance;
+        }
+
+        // Global variables for profit tracking
+        let sessionClosedProfit = 0.0;
+        let tpAlertPlayed = false;
+
+        // This function will now be called when a contract is SOLD/CLOSED
+        window.updateSessionProfit = function (profit) {
+            sessionClosedProfit += parseFloat(profit);
+
+            const displayProfit = sessionClosedProfit >= 0 ? `+${sessionClosedProfit.toFixed(2)}` : sessionClosedProfit.toFixed(2);
+
+            // Update Label
+            const lbl = document.getElementById('lblBalance');
+            if (lbl) {
+                lbl.textContent = displayProfit;
+                lbl.style.color = sessionClosedProfit >= 0 ? '#4caf50' : '#ef5350';
+            }
+
+            // Check Target Profit
+            const tpInput = document.getElementById('inpTargetProfit');
+            if (tpInput && tpInput.value) {
+                const targetProfit = parseFloat(tpInput.value);
+
+                // Condition: If Session Profit >= Target Profit
+                if (sessionClosedProfit >= targetProfit && !tpAlertPlayed) {
+                    // Trigger
+                    if (DerivTrader && !DerivTrader.isIdle) {
+                        DerivTrader.toggleIdle(true); // FORCE IDLE ON
+                        log(`🎉 Target Profit Reached! (${displayProfit} >= ${targetProfit}). Idle Mode ON.`);
+                        playApplause();
+                        tpAlertPlayed = true;
+                    }
+                }
+            }
+        }
+
+        function playApplause() {
+            const audio = new Audio('applause.mp3');
+            audio.volume = 0.7;
+            audio.play().catch(e => console.warn('Applause play failed:', e));
+        }
+
+    </script>
+
+    <script>
+        // Use the exact field logic requested
+        let lastContractCount = 0;
+
+        // Hook into handleMessage JUST for initialization
+        const originalHandleMessage = handleMessage;
+        handleMessage = function (data) {
+            originalHandleMessage(data);
+
+            // We NO LONGER update profit from balance stream
+            // if (data.balance) { ... } -> Removed to avoid showing unrealized P/L
+
+            if (data.authorize) {
+                // Reset session profit on new auth
+                sessionClosedProfit = 0.0;
+                document.getElementById('lblBalance').textContent = "+0.00";
+                document.getElementById('lblBalance').style.color = '#fff';
+                tpAlertPlayed = false;
+
+                // We still subscribe to balance for other reasons (account info) but won't use it for the Profit Label
+                ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+            }
+        };
+
+        // ===== Dynamic Asset Management =====
+        function bindCheckboxEvents() {
+            document.querySelectorAll('.cbAsset').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const symbol = e.target.value;
+                    const isRunning = ws && ws.readyState === 1 && document.getElementById('btnStart').disabled;
+
+                    if (isRunning) {
+                        if (e.target.checked) {
+                            startSingleAsset(symbol);
+                        } else {
+                            stopSingleAsset(symbol);
+                        }
+                    }
+                });
+            });
+        }
+
+        function startSingleAsset(symbol) {
+            if (assets[symbol]) return; // Already running
+
+            log(`➕ Adding asset: ${symbol}...`);
+
+            // Update runtimeOptions from inputs (in case they changed)
+            runtimeOptions = {
+                ema1Period: parseInt(document.getElementById('inpEma1Period').value) || 7,
+                ema1Type: document.getElementById('selEma1Type').value,
+                ema2Period: parseInt(document.getElementById('inpEma2Period').value) || 25,
+                ema2Type: document.getElementById('selEma2Type').value,
+                ema3Period: parseInt(document.getElementById('inpEma3Period').value) || 99,
+                ema3Type: document.getElementById('selEma3Type').value,
+                atrPeriod: parseInt(document.getElementById('inpAtrPeriod').value) || 14,
+                atrMultiplier: parseFloat(document.getElementById('inpAtrMult').value) || 2,
+                bbPeriod: parseInt(document.getElementById('inpBbPeriod').value) || 20,
+                ciPeriod: parseInt(document.getElementById('inpCiPeriod').value) || 14,
+                adxPeriod: parseInt(document.getElementById('inpAdxPeriod').value) || 14,
+                rsiPeriod: parseInt(document.getElementById('inpRsiPeriod').value) || 14,
+                flatThreshold: parseFloat(document.getElementById('inpFlat').value) || 0.0001,
+                macdNarrow: parseFloat(document.getElementById('inpMacd').value) || 0.15
+            };
+
+            // Initialize state
+            assets[symbol] = {
+                gen: null, currentCandle: null, tickCount: 0, subscriptionId: null, candleHistory: []
+            };
+
+            // Ensure Trader State exists if using trader
+            if (typeof DerivTrader !== 'undefined' && DerivTrader.symbolStates) {
+                if (!DerivTrader.symbolStates[symbol]) {
+                    DerivTrader.symbolStates[symbol] = {
+                        martingaleLevel: 0,
+                        activeContract: null
+                    };
+                }
+            }
+
+            const count = parseInt(document.getElementById('selCount').value);
+
+            // Request History
+            const reqId = reqIdCounter++;
+            reqIdMap[reqId] = symbol;
+            ws.send(JSON.stringify({
+                ticks_history: symbol, adjust_start_time: 1,
+                count: count, end: "latest", style: "candles",
+                granularity: 60, req_id: reqId
+            }));
+
+            // Subscribe
+            ws.send(JSON.stringify({
+                ticks_history: symbol, adjust_start_time: 1,
+                count: 0, end: "latest", style: "ticks", subscribe: 1
+            }));
+        }
+
+        function stopSingleAsset(symbol) {
+            const a = assets[symbol];
+            if (!a) return;
+
+            if (a.subscriptionId && ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ forget: a.subscriptionId }));
+            }
+
+            delete assets[symbol];
+            delete reqIdMap[Object.keys(reqIdMap).find(key => reqIdMap[key] === symbol)]; // Cleanup reqId map if possible, though not strictly necessary
+
+            // Remove row from table
+            const row = document.getElementById('row_' + symbol);
+            if (row) row.remove();
+
+            log(`➖ Removed asset: ${symbol}`);
+        }
+
+        function updateTradeTable() {
+            if (!DerivTrader || !DerivTrader.contracts) return;
+
+            const tbody = document.getElementById('contractsTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            // Sort by purchase time desc (newest first)
+            const sortedContracts = [...DerivTrader.contracts].sort((a, b) => b.purchase_time - a.purchase_time);
+
+            // Check for new trades to play sound
+            const currentCount = DerivTrader.contracts.length;
+            if (lastContractCount < currentCount) {
+                playTradeSound();
+            }
+            lastContractCount = currentCount;
+
+            sortedContracts.forEach((contract, index) => {
+                const tr = document.createElement('tr');
+
+                const profit = contract.profit;
+                // Note: contract.profit from POC is purely profit/loss (not including stake return typically, need to check API)
+                // API: profit is (bid_price - buy_price).
+
+                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
+                const profitSign = profit > 0 ? '+' : '';
+
+                const typeClass = contract.contract_type === 'CALL' ? 'type-call' : 'type-put';
+                const typeLabel = contract.contract_type === 'CALL' ? 'CALL 🟢' : 'PUT 🔴';
+
+                const buyTimeStr = formatTimestamp(contract.purchase_time);
+                const expiryTimeStr = contract.expiry_time ? formatTimestamp(contract.expiry_time) : '-';
+                const remainingStr = contract.expiry_time ? calculateTimeRemaining(contract.expiry_time) : '-';
+
+                // Status styling
+                let statusColor = '#d4d4d4';
+                if (contract.status === 'won') statusColor = '#4caf50';
+                if (contract.status === 'lost') statusColor = '#ef5350';
+
+                // Sell Button logic
+                let actionHtml = '';
+                if (contract.status === 'open' && !contract.is_sold) {
+                    actionHtml = `<button onclick="sellContract(${contract.contract_id})" style="padding:2px 8px; font-size:0.75em; background:#ef5350; border:none; border-radius:4px; color:white; cursor:pointer;">Sell</button>`;
+                } else {
+                    actionHtml = `<span style="color:${statusColor}; font-weight:bold;">${contract.status.toUpperCase()}</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td>${sortedContracts.length - index}</td>
+                    <td>${contract.contract_id}</td>
+                    <td><b>${contract.symbol}</b></td>
+                    <td><span class="contract-type ${typeClass}">${typeLabel}</span></td>
+                    <td>${contract.buy_price.toFixed(2)}</td>
+                    <td>${contract.payout.toFixed(2)}</td>
+                    <td>${buyTimeStr}</td>
+                    <td>${expiryTimeStr}</td>
+                    <td class="time-remaining">${remainingStr}</td>
+                    <td style="color: #ef5350;">${contract.minProfit.toFixed(2)}</td>
+                    <td style="color: #4caf50;">${contract.maxProfit.toFixed(2)}</td>
+                    <td style="font-weight:bold; color:${profit < 0 ? '#ef5350' : '#4caf50'};">${profitSign}${profit.toFixed(2)}</td>
+                    <td>${actionHtml}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleTimeString('th-TH');
+        }
+
+        function calculateTimeRemaining(expiryTime) {
+            if (!expiryTime) return '-';
+            const now = Math.floor(Date.now() / 1000);
+            const remaining = expiryTime - now;
+
+            if (remaining <= 0) return '00:00';
+
+            const minutes = Math.floor(remaining / 60);
+            const seconds = remaining % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function playTradeSound() {
+            const cb = document.getElementById('cbPlaySound');
+            if (cb && cb.checked) {
+                const audio = new Audio('ginggong.mp3');
+                audio.volume = 0.5;
+                audio.play().catch(e => console.warn('Audio play failed:', e));
+            }
+        }
+
+        function sellContract(contractId) {
+            if (confirm('Are you sure you want to sell this contract?')) {
+                if (ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({
+                        sell: contractId,
+                        price: 0
+                    }));
+                }
+            }
+        }
+    </script>
+	<script>
+	 async function doAjaxGetEMAConfig() {
+	       console.clear();
+	       
+	       
+	       
+	       const ajaxurl = 'https://lovetoshopmall.com/SaveColorCodeMaster.php';
+	       const data = { 
+	           "Mode": 'getLabConfig',
+	           "planName": "thepapers.in"
+	       };
+	       
+	       try {          
+	           const result = await $.ajax({
+	               url: ajaxurl,
+	               type: 'POST',
+	               contentType: 'application/json',  // เพิ่มบรรทัดนี้
+	               dataType: 'json',
+	               data: JSON.stringify(data),
+	               success: function(response, textStatus, jqXHR) {
+	                   console.log('Success:', textStatus + ' - Status: ' + jqXHR.status);
+	                   console.log('Config Response:', response);
+
+	                   //resultDiv.textContent = JSON.stringify(response, null, 2);
+					   GEN_OPTIONS = {
+                         ema1Period: response.result.periodShort, 
+						 ema1Type: response.result.emaShortType, 
+						 ema2Period: response.result.periodMedium, 
+						 ema2Type: response.result.emaMediumType, 
+                         ema3Period: response.result.periodLong , 
+						 ema3Type: response.result.emaLongType , 
+						 atrPeriod: 14, atrMultiplier: 2,
+                         bbPeriod: 20, ciPeriod: 14, adxPeriod: 14, rsiPeriod: 14,
+                         flatThreshold: 0.0001, macdNarrow: 0.15
+                       }
+
+					   document.getElementById("inpEma1Period").value = response.result.periodShort;
+
+					   document.getElementById("selEma1Type").value = response.result.emaShortType;
+
+					   document.getElementById("inpEma2Period").value = response.result.periodMedium;
+
+					   document.getElementById("selEma2Type").value = response.result.emaMediumType;
+
+                       document.getElementById("inpEma3Period").value = response.result.periodLong;
+
+					   document.getElementById("selEma3Type").value = response.result.emaLongType;
+
+
+					   
+					    console.log('GEN_OPTIONS->',GEN_OPTIONS);
+						runtimeOptions = {
+                         ...GEN_OPTIONS
+                        }
+					   
+	               },
+	               error: function(jqXHR, textStatus, errorThrown) {
+	                   console.error('Error:', textStatus + ' - Status: ' + jqXHR.status + ' - ' + errorThrown);
+	                   console.error('Response Text:', jqXHR.responseText);
+	               }
+	           });
+	           
+	           console.log('Final Result:', result);
+	           return result;
+	           
+	       } catch (error) {
+	           console.error('Catch Error:', error);
+	           resultDiv.textContent = 'Catch Error: ' + error.message;
+	           alert('Error: ' + error.message);
+	       }
+	   }
+	 
+	</script>
+	<!--
+	<script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
+	<script src="https://thepapers.in/strategy/colorAlter/colorChangeAnaly.js" ></script>
+	<script src="https://thepapers.in/js/indicator.js" ></script>
+	
+	<script>// เรียก result = mainAlterColorAnaly(candleData)</script>
+	<script src="https://thepapers.in/phpAllPredictAPI/autoSaveInputs.js" ></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+	  -->
+	
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // โค้ดที่ต้องการให้ทำงานเมื่อ DOM โหลดเสร็จ
+            console.log('DOM fully loaded and parsed');
+			doAjaxGetEMAConfig(); //return ;
+			
+            ColorCodeMaster = doAjaxRetrieveCodeCandle();
+
+            // Link Trader to UI
+            if (typeof DerivTrader !== 'undefined') {
+                DerivTrader.updateUI = updateTradeTable;
+            } 
+
+			
+
+            bindCheckboxEvents(); // Initialize dynamic asset listeners
+        });
+
+
+    </script>
+</body>
+
+</html>

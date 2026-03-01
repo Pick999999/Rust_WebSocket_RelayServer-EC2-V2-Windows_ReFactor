@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ========================================================================================
+    📝 คู่มือการใช้งาน (THAI MANUAL) - MultiAssetBundle Test Page
+    ========================================================================================
+    
+    ไฟล์นี้ใช้สำหรับทดสอบการทำงานของ MultiAssetBundle.js ซึ่งรวบรวมฟังก์ชันทั้งหมดไว้ในที่เดียว
+    
+    📌 สรุปการทำงานหลัก (Key Functions from MultiAssetBundle.js):
+    
+    1. new MultiAssetManager(appId)
+       - เริ่มต้นสร้าง Instance สำหรับจัดการข้อมูลและการคำนวณ
+       - ทำหน้าที่เชื่อมต่อ Deriv API และเตรียม WebGPU
+    
+    2. manager.execute(params)
+       - ***หัวใจสำคัญ (Core Function)***
+       - ฟังก์ชันนี้ทำ 2 หน้าที่พร้อมกันภายในคำสั่งเดียว:
+         (1) Fetch Data: ดึงข้อมูลแท่งเทียน (Candles) จาก Deriv API ตาม assets ที่ระบุ
+         (2) Calculate Indicators: นำข้อมูลที่ได้มาคำนวณ Technical Indicators (RSI, Choppy, EMA)
+       
+       - Parameters (params) ประกอบด้วย:
+         * assets: รายชื่อคู่เงิน/หุ้น (เช่น ['R_10', 'R_25'])
+         * latest: จำนวนแท่งย้อนหลังที่ต้องการดึง (ใช้กรณีไม่ระบุวันที่)
+         * startDate, stopDate: ระบุช่วงเวลาเริ่มต้น-สิ้นสุด (ใช้กรณีระบุวันที่เจาะจง)
+         * duration: ขนาดของ Timeframe (เช่น 1, 5)
+         * durationUnit: หน่วยของเวลา ('m'=นาที, 'h'=ชั่วโมง)
+         * useSuperKernel: เปิด/ปิด การใช้ GPU Batch Processing (คำนวณพร้อมกันหลายตัว)
+         
+    3. ผลลัพธ์ (Returns)
+       - คืนค่า object ที่ประกอบด้วย:
+         * result.assets: ข้อมูลดิบ (Open, High, Low, Close) ของแต่ละตัว
+         * result.indicators: ค่า Indicators ที่คำนวณเสร็จแล้ว ของแต่ละตัว
+         * result.stats: สถิติการทำงาน (เวลาที่ใช้, โหมด GPU, จำนวนที่โหลดสำเร็จ)
+    
+    ========================================================================================
+-->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MultiAsset Bundle Test (TH)</title>
+    <!-- เรียกใช้ GPU.js สำหรับการคำนวณผ่านการ์ดจอ -->
+    <script src="https://cdn.jsdelivr.net/npm/gpu.js@latest/dist/gpu-browser.min.js"></script>
+    <!-- เรียกใช้ Bundle ไฟล์ที่เราสร้างขึ้น -->
+    <script src="MultiAssetBundle.js"></script>
+    <style>
+        body {
+            font-family: "Courier New", monospace;
+            background: #0a0e27;
+            color: #00ff88;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #4a9eff;
+            text-align: center;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .controls {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .output-panel {
+            background: #000;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 800px;
+            overflow-y: auto;
+            border: 1px solid #2a3654;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #4a9eff;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            background: #0f132a;
+            border: 1px solid #2a3654;
+            color: #fff;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        button {
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #357ab9;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-ok {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .status-err {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+
+        th {
+            color: #4a9eff;
+        }
+
+        tr:hover {
+            background: #111;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>📦 MultiAsset Bundle Tester (Thai Commentary)</h1>
+
+    <div class="container">
+        <!-- Controls Panel -->
+        <div class="controls">
+            <div class="form-group">
+                <label>App ID (รหัสแอพ)</label>
+                <input type="text" id="appId" value="1089">
+            </div>
+
+            <div class="form-group">
+                <label>Assets (รายชื่อหุ้น/คู่เงิน คั่นด้วยลูกน้ำ)</label>
+                <textarea id="assets" rows="4">R_10, R_25, R_50, R_75, R_100, 1HZ10V, 1HZ25V</textarea>
+            </div>
+
+            <div class="row">
+                <div class="form-group" style="flex:1">
+                    <label>โหมดข้อมูล (Data Mode)</label>
+                    <select id="dataMode" onchange="toggleDateInputs()">
+                        <option value="latest">จำนวนล่าสุด (Latest Count)</option>
+                        <option value="range">ช่วงวันเวลา (Date Range)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>จำนวนแท่ง (Count)</label>
+                    <input type="number" id="latestCount" value="1000">
+                </div>
+            </div>
+
+            <div id="dateInputs" class="row" style="display:none;">
+                <div class="form-group" style="flex:1">
+                    <label>วันเริ่ม (Start Date)</label>
+                    <input type="datetime-local" id="startDate">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>วันสิ้นสุด (End Date)</label>
+                    <input type="datetime-local" id="endDate">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group" style="flex:1">
+                    <label>ระยะเวลาแท่ง (Duration)</label>
+                    <input type="number" id="duration" value="1">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>หน่วย (Unit)</label>
+                    <select id="durationUnit">
+                        <option value="m">นาที (Minutes)</option>
+                        <option value="s">วินาที (Seconds)</option>
+                        <option value="h">ชั่วโมง (Hours)</option>
+                        <option value="d">วัน (Days)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex; align-items:center; cursor:pointer;">
+                    <input type="checkbox" id="useSuperKernel" checked
+                        style="width:20px; height:20px; margin-right:10px;">
+                    Enable Super Kernel (GPU Batch)
+                </label>
+            </div>
+
+            <button id="runBtn" onclick="runAnalysis()">🚀 เริ่มวิเคราะห์ (Run Analysis)</button>
+            <div id="statusMsg" style="margin-top:10px; text-align:center; color:#888;">Ready</div>
+        </div>
+
+        <!-- Output Panel -->
+        <div class="output-panel">
+            <h3>📊 ผลลัพธ์ (Results Output)</h3>
+            <div id="tableContainer"></div>
+            <hr style="border-color:#333; margin:20px 0;">
+            <h3>📝 บันทึกการทำงาน (Raw Log)</h3>
+            <div id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        let manager = null;
+
+        function log(msg, type = 'info') {
+            const el = document.getElementById('logOutput');
+            const color = type === 'error' ? '#ff4444' : (type === 'success' ? '#00ff88' : '#aaa');
+            el.innerHTML += `<div style="color:${color}; margin-bottom:4px;">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function toggleDateInputs() {
+            const mode = document.getElementById('dataMode').value;
+            const dateInputs = document.getElementById('dateInputs');
+            const latestInput = document.getElementById('latestCount').parentElement;
+
+            if (mode === 'range') {
+                dateInputs.style.display = 'flex';
+                latestInput.style.display = 'none';
+            } else {
+                dateInputs.style.display = 'none';
+                latestInput.style.display = 'block';
+            }
+        }
+
+        async function runAnalysis() {
+            const btn = document.getElementById('runBtn');
+            const status = document.getElementById('statusMsg');
+            const appId = document.getElementById('appId').value;
+
+            btn.disabled = true;
+            status.textContent = "Initializing & Loading...";
+            document.getElementById('logOutput').innerHTML = "";
+            document.getElementById('tableContainer').innerHTML = "";
+
+            try {
+                if (!manager) {
+                    // สร้าง Manager Instance
+                    manager = new MultiAssetManager(appId);
+                }
+
+                // ดึงค่าจากหน้าจอ (Prepare Parameters)
+                const rawAssets = document.getElementById('assets').value;
+                const assets = rawAssets.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+                const duration = parseInt(document.getElementById('duration').value);
+                const durationUnit = document.getElementById('durationUnit').value;
+                const useSuperKernel = document.getElementById('useSuperKernel').checked;
+                const dataMode = document.getElementById('dataMode').value;
+
+                let params = {
+                    assets: assets,
+                    duration: duration,
+                    durationUnit: durationUnit,
+                    useSuperKernel: useSuperKernel
+                };
+
+                if (dataMode === 'range') {
+                    const startVal = document.getElementById('startDate').value;
+                    const endVal = document.getElementById('endDate').value;
+
+                    if (!startVal) throw new Error("Start Date is required for Range mode");
+
+                    params.startDate = new Date(startVal);
+                    if (endVal) params.stopDate = new Date(endVal);
+                } else {
+                    params.latest = parseInt(document.getElementById('latestCount').value);
+                }
+
+                log(`Starting Analysis for ${assets.length} assets...`);
+                log(`Params: ${JSON.stringify(params)}`);
+
+                const startTime = performance.now();
+
+                // =========================================================================
+                // 🔴 จุดเรียกใช้งานหลัก (Main Execution Call) 🔴
+                // บรรทัดนี้ (manager.execute) ทำงาน 2 ขั้นตอน:
+                // 1. เรียกข้อมูล (Fetching Data): MultiAssetLoader จะดึง Candle จาก Deriv
+                // 2. คำนวณ (Calculating): WebGPUIndicators จะคำนวณ EMA, RSI, Choppy
+                // =========================================================================
+                const result = await manager.execute(params);
+
+                const endTime = performance.now();
+
+                const timeTaken = (endTime - startTime).toFixed(2);
+                status.textContent = `Completed in ${timeTaken}ms`;
+
+                if (result.success) {
+                    log(`✅ Success! Time: ${timeTaken}ms`, 'success');
+                    displayResults(result);
+                } else {
+                    log(`❌ Failure: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error(error);
+                log(`❌ Error: ${error.message}`, 'error');
+                status.textContent = "Error occurred";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function displayResults(result) {
+            const container = document.getElementById('tableContainer');
+            if (!result.assets || !result.indicators) return;
+
+            let html = `
+                <div style="margin-bottom:10px; font-size:14px;">
+                    <span>GPU Mode: <strong style="color:#00ff88">${result.stats.gpuMode}</strong></span> | 
+                    <span>Loaded: ${result.stats.loaded}</span> | 
+                    <span>Failed: ${result.stats.failed}</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Symbol (ชื่อ)</th>
+                            <th>Candles (จำนวนแท่ง)</th>
+                            <th>Last Close (ราคาปิดล่าสุด)</th>
+                            <th>RSI (14)</th>
+                            <th>Choppy (14)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            Object.keys(result.assets).forEach(symbol => {
+                const asset = result.assets[symbol];
+                const ind = result.indicators[symbol];
+
+                if (!asset || !ind) return;
+
+                const lastClose = asset.closes[asset.closes.length - 1]?.toFixed(4) || "N/A";
+                const lastRSI = ind.rsi[ind.rsi.length - 1]?.toFixed(2) || "N/A";
+                const lastChop = ind.choppy[ind.choppy.length - 1]?.toFixed(2) || "N/A";
+
+                html += `
+                    <tr>
+                        <td><strong>${symbol}</strong></td>
+                        <td>${asset.closes.length}</td>
+                        <td>${lastClose}</td>
+                        <td style="color:${parseFloat(lastRSI) > 70 ? '#ff4444' : (parseFloat(lastRSI) < 30 ? '#00ff88' : '#fff')}">${lastRSI}</td>
+                        <td style="color:${parseFloat(lastChop) < 38 ? '#00ff88' : (parseFloat(lastChop) > 61.8 ? '#ff4444' : '#fff')}">${lastChop}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // ตั้งค่า Default Dates
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const toLocalISO = (date) => {
+            const offset = date.getTimezoneOffset() * 60000;
+            return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+        };
+
+        document.getElementById('startDate').value = toLocalISO(yesterday);
+        document.getElementById('endDate').value = toLocalISO(now);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Deriv Accumulator Bot</title>
+    
+    <!-- Tabler CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    
+    <!-- Project Dependencies -->
+    <script src="MultiAssetBundle.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="js/backgroundColorZonesPlugin.js"></script>
+    
+    <style>
+        :root {
+            --tblr-body-bg: #1e1e1e;
+            --tblr-card-bg: #252526;
+        }
+
+        /* Light Theme Variables */
+        [data-bs-theme="light"] {
+            --tblr-body-bg: #f5f7fb;
+            --tblr-card-bg: #ffffff;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--tblr-body-bg) 0%, #2d2d2d 100%);
+            min-height: 100vh;
+            transition: background 0.3s ease;
+        }
+
+        [data-bs-theme="light"] body {
+            background: linear-gradient(135deg, #f5f7fb 0%, #e3e8f0 100%);
+        }
+
+        .page {
+            padding-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--tblr-card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        [data-bs-theme="light"] .card {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .growth-btn {
+            min-height: 2.5rem;
+            font-size: 0.875rem;
+        }
+
+        .growth-btn.active {
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            border-color: #0ea5e9;
+        }
+
+        #chartContainer {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        [data-bs-theme="light"] #chartContainer {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(6, 182, 212, 0.1));
+            border: 1px solid rgba(14, 165, 233, 0.3);
+        }
+
+        .stat-card.win {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.1));
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .stat-card.loss {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .trade-log {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .json-output {
+            background: #1a1a1a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+        }
+
+        [data-bs-theme="light"] .json-output {
+            background: #f8f9fa;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: #212529;
+        }
+
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 1rem 0;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+
+            .btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-bs-theme="light"] ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        [data-bs-theme="light"] ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        [data-bs-theme="light"] ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Theme toggle animation */
+        #themeToggle {
+            transition: transform 0.3s ease;
+        }
+
+        #themeToggle:hover {
+            transform: rotate(20deg);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="container-xl">
+            <!-- Header -->
+            <div class="page-header d-print-none">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">
+                            <i class="ti ti-chart-line me-2"></i>
+                            Deriv Accumulator Bot
+                        </h2>
+                        <div class="text-muted mt-1">Automated Trading System</div>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-icon" onclick="toggleTheme()" id="themeToggle" title="Toggle Theme">
+                            <i class="ti ti-moon" id="themeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth Section -->
+            <div class="row row-cards mt-3" id="authSection">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-key me-2"></i>API Authentication
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Deriv API Token</label>
+                                <input type="password" class="form-control" id="apiToken" 
+                                    placeholder="Enter your API Token" value="lt5UMO6bNvmZQaR">
+                            </div>
+                            <button class="btn btn-primary w-100" onclick="connectAndAuthorize()">
+                                <i class="ti ti-login me-2"></i>Connect & Authorize
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Config Section -->
+            <div class="row row-cards mt-3" id="configSection" style="display:none;">
+                
+                <!-- Configuration Card -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-settings me-2"></i>Bot Configuration
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <!-- Asset Selection -->
+                            <div class="mb-3">
+                                <label class="form-label">Underlying Asset</label>
+                                <select class="form-select" id="assetSelect">
+                                    <option>Loading...</option>
+                                </select>
+                            </div>
+
+                            <!-- Growth Rate -->
+                            <div class="mb-3">
+                                <label class="form-label">Growth Rate</label>
+                                <div class="btn-group w-100" role="group" id="growthOptions">
+                                    <button type="button" class="btn growth-btn" data-value="0.01">1%</button>
+                                    <button type="button" class="btn growth-btn" data-value="0.02">2%</button>
+                                    <button type="button" class="btn growth-btn" data-value="0.03">3%</button>
+                                    <button type="button" class="btn growth-btn" data-value="0.04">4%</button>
+                                    <button type="button" class="btn growth-btn" data-value="0.05">5%</button>
+                                </div>
+                                <input type="hidden" id="growthRate" value="">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Stake (USD)</label>
+                                        <input type="number" class="form-control" id="stakeAmount" 
+                                            value="10" min="1" step="0.1">
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Take Profit (USD)</label>
+                                        <input type="number" class="form-control" id="takeProfit" 
+                                            value="1.5" min="0.1" step="0.1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tick Sell Config -->
+                            <div class="card card-sm mb-3" style="background: rgba(14, 165, 233, 0.05);">
+                                <div class="card-body">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="useTickSell">
+                                        <label class="form-check-label">Enable Tick Sell (Sniper Mode)</label>
+                                    </div>
+                                    <label class="form-label">Sell at Tick (N)</label>
+                                    <input type="number" class="form-control" id="tickSellTarget" 
+                                        value="2" min="1" step="1">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Loop Count</label>
+                                        <input type="number" class="form-control" id="loopCount" 
+                                            value="15" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Delay (Seconds)</label>
+                                        <input type="number" class="form-control" id="loopDelay" 
+                                            value="3" min="1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Section -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-chart-candle me-2"></i>Live Chart
+                            </h3>
+                            <div class="card-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="toggleChart()">
+                                    <i class="ti ti-eye-off" id="chartToggleIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body" id="chartWrapper">
+                            <div class="row mb-3">
+                                <div class="col-sm-6 mb-2">
+                                    <label class="form-label form-label-sm">Chart Asset</label>
+                                    <select class="form-select form-select-sm" id="chartAssetSelect" 
+                                        onchange="changeChartAsset()"></select>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <label class="form-label form-label-sm">Chart Mode</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="radio" class="btn-check" name="chartMode" id="modeCandles" 
+                                            value="candles" checked onchange="changeChartMode(this.value)">
+                                        <label class="btn btn-sm" for="modeCandles">Time (1m)</label>
+                                        
+                                        <input type="radio" class="btn-check" name="chartMode" id="modeTicks" 
+                                            value="ticks" onchange="changeChartMode(this.value)">
+                                        <label class="btn btn-sm" for="modeTicks">Every Tick</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="chartContainer" style="width: 100%; height: 300px;"></div>
+
+                            <div class="row mt-3">
+                                <div class="col-4">
+                                    <div class="card card-sm stat-card">
+                                        <div class="card-body p-2 text-center">
+                                            <div class="text-muted small">High</div>
+                                            <div class="h4 mb-0 text-success" id="valHigh">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="card card-sm stat-card">
+                                        <div class="card-body p-2 text-center">
+                                            <div class="text-muted small">Low</div>
+                                            <div class="h4 mb-0 text-danger" id="valLow">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="card card-sm stat-card">
+                                        <div class="card-body p-2 text-center">
+                                            <div class="text-muted small">Range</div>
+                                            <div class="h4 mb-0 text-info" id="valDiff">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="col-12">
+                    <button class="btn btn-success w-100 btn-lg" id="btnStart" onclick="startBot()">
+                        <i class="ti ti-player-play me-2"></i>Start Bot
+                    </button>
+                    <button class="btn btn-danger w-100 btn-lg" id="btnStop" onclick="stopBot()" style="display:none;">
+                        <i class="ti ti-player-stop me-2"></i>Stop Bot
+                    </button>
+                </div>
+
+                <!-- Status Alert -->
+                <div class="col-12">
+                    <div class="alert" id="status" style="display:none;"></div>
+                </div>
+
+                <!-- Live Trade Monitor -->
+                <div class="col-12" id="monitorSection" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-activity me-2"></i>Live Trade Monitor
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive trade-log">
+                                <table class="table table-sm table-hover table-vcenter card-table" id="monitorTable">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>ID</th>
+                                            <th>Time</th>
+                                            <th>Spot</th>
+                                            <th>Δ</th>
+                                            <th>Profit</th>
+                                            <th>Tick</th>
+                                            <th>High</th>
+                                            <th>Low</th>
+                                            <th>Gap</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Report -->
+                <div class="col-12" id="reportSection" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="ti ti-report-analytics me-2"></i>Session Report
+                            </h3>
+                            <div class="card-actions">
+                                <button class="btn btn-sm btn-ghost-danger" onclick="resetStats()" title="Reset Statistics">
+                                    <i class="ti ti-refresh"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Stats Cards -->
+                            <div class="row mb-3">
+                                <div class="col-6 col-sm-3">
+                                    <div class="card card-sm stat-card">
+                                        <div class="card-body text-center">
+                                            <div class="text-muted small">Total</div>
+                                            <div class="h2 mb-0" id="sumTotal">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <div class="card card-sm stat-card win">
+                                        <div class="card-body text-center">
+                                            <div class="text-muted small">Win</div>
+                                            <div class="h2 mb-0 text-success" id="sumWin">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <div class="card card-sm stat-card loss">
+                                        <div class="card-body text-center">
+                                            <div class="text-muted small">Loss</div>
+                                            <div class="h2 mb-0 text-danger" id="sumLoss">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <div class="card card-sm stat-card">
+                                        <div class="card-body text-center">
+                                            <div class="text-muted small">Profit</div>
+                                            <div class="h3 mb-0" id="sumPnl">$0.00</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trade Log Table -->
+                            <div class="table-responsive trade-log mb-3">
+                                <table class="table table-sm table-hover" id="logTable">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Time</th>
+                                            <th>Asset</th>
+                                            <th>Result</th>
+                                            <th>Profit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+
+                            <!-- JSON Data Export -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">
+                                        <i class="ti ti-file-code me-2"></i>Trade Data (JSON)
+                                    </label>
+                                    <button class="btn btn-sm btn-primary" onclick="copyTradeData()">
+                                        <i class="ti ti-copy me-1"></i>Copy
+                                    </button>
+                                </div>
+                                <textarea class="form-control json-output" id="tradeDataJson" 
+                                    readonly rows="8">[]</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio -->
+    <audio id="applauseSound" src="applause.mp3"></audio>
+
+    <!-- Tabler JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+
+    <script>
+        // Global State
+        let api = null;
+        let isAuthorized = false;
+        let isBotRunning = false;
+        let currentLoop = 0;
+        let totalLoops = 0;
+        let delaySeconds = 0;
+        let currentContractId = null;
+        let sessionStats = { wins: 0, losses: 0, pnl: 0 };
+
+        // Trade Data Collection
+        let allTradesData = [];
+        let currentTradeData = null;
+        let currentTradeDetails = [];
+
+        // Chart State
+        let chart = null;
+        let candleSeries = null;
+        let currentChartSubscriptionId = null;
+        let chartMode = 'candles';
+        let tickCounter = 0;
+
+        // Barrier Lines & Zones
+        let highBarrierLine = null;
+        let lowBarrierLine = null;
+        let barrierZonePlugin = null;
+
+        // Trade Markers
+        let tradeMarkers = [];
+        let markerSeries = null;
+
+        // 1. Initial Setup
+        async function init() {
+            // Load saved theme
+            loadTheme();
+
+            // Setup growth rate buttons
+            const growthBtns = document.querySelectorAll('.growth-btn');
+            growthBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    growthBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById('growthRate').value = this.getAttribute('data-value');
+                });
+            });
+
+            // Select default 3%
+            const defaultBtn = document.querySelector('.growth-btn[data-value="0.03"]');
+            if (defaultBtn) defaultBtn.click();
+
+            populateAssetSelect();
+        }
+
+        // Theme Management
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-bs-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+            
+            // Update chart colors
+            if (chart) {
+                updateChartTheme(newTheme);
+            }
+        }
+
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('themeIcon');
+            if (theme === 'dark') {
+                icon.className = 'ti ti-sun'; // แสดง sun icon ใน dark mode
+            } else {
+                icon.className = 'ti ti-moon'; // แสดง moon icon ใน light mode
+            }
+        }
+
+        function updateChartTheme(theme) {
+            if (!chart) return;
+            
+            const isDark = theme === 'dark';
+            chart.applyOptions({
+                layout: {
+                    background: { type: 'solid', color: isDark ? '#1a1a1a' : '#ffffff' },
+                    textColor: isDark ? '#d4d4d4' : '#212529',
+                },
+                grid: {
+                    vertLines: { color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                    horzLines: { color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                },
+                rightPriceScale: {
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                },
+                timeScale: {
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                },
+            });
+        }
+
+        async function populateAssetSelect(derivApiInstance = null) {
+            const assetSelect = document.getElementById('assetSelect');
+            assetSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+
+            try {
+                let activeSymbols = [];
+                if (derivApiInstance) {
+                    activeSymbols = await derivApiInstance.getActiveSymbols();
+                } else {
+                    const tempApi = new DerivAPI("1089");
+                    await tempApi.connect();
+                    activeSymbols = await tempApi.getActiveSymbols();
+                    tempApi.disconnect();
+                }
+
+                const volatilityIndices = activeSymbols.filter(s =>
+                    (s.market === 'synthetic_index' && s.submarket === 'random_index') ||
+                    s.submarket === 'random_index'
+                ).sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+                assetSelect.innerHTML = '';
+                volatilityIndices.forEach(asset => {
+                    const option = document.createElement('option');
+                    option.value = asset.symbol;
+                    option.textContent = `${asset.symbol} - ${asset.display_name}`;
+                    assetSelect.appendChild(option);
+                });
+
+                if (volatilityIndices.some(a => a.symbol === "R_100")) assetSelect.value = "R_100";
+
+                const chartSelect = document.getElementById('chartAssetSelect');
+                if (chartSelect) {
+                    chartSelect.innerHTML = assetSelect.innerHTML;
+                    chartSelect.value = assetSelect.value;
+                }
+
+            } catch (e) {
+                console.warn("Asset fetch failed", e);
+                assetSelect.innerHTML = '<option value="R_100">Volatility 100 (1s)</option>';
+            }
+        }
+
+        // 2. Auth
+        async function connectAndAuthorize() {
+            const token = document.getElementById('apiToken').value.trim();
+            if (!token) return showStatus("Enter API Token", "danger");
+
+            try {
+                if (api) api.disconnect();
+                api = new DerivAPI("1089");
+
+                const originalHandle = api.handleMessage.bind(api);
+                api.handleMessage = function (data) {
+                    originalHandle(data);
+                    if (data.msg_type && this.messageHandlers.has(data.msg_type)) {
+                        this.messageHandlers.get(data.msg_type)(data);
+                    }
+                };
+
+                await api.connect();
+                const authResp = await api.sendAndWait({ authorize: token });
+                if (authResp.error) throw new Error(authResp.error.message);
+
+                isAuthorized = true;
+                showStatus("✅ Connected successfully!", "success");
+
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('configSection').style.display = 'block';
+
+                populateAssetSelect(api);
+                initChart();
+                
+                const defaultAsset = document.getElementById('chartAssetSelect').value;
+                if (defaultAsset) subscribeChart(defaultAsset);
+
+            } catch (e) {
+                showStatus(`❌ Auth Failed: ${e.message}`, "danger");
+            }
+        }
+
+        // 3. Bot Control
+        function startBot() {
+            if (!isAuthorized) return;
+
+            totalLoops = parseInt(document.getElementById('loopCount').value);
+            delaySeconds = parseInt(document.getElementById('loopDelay').value);
+
+            currentLoop = 0;
+            isBotRunning = true;
+            
+            // ไม่ reset sessionStats - เก็บสะสม profit จากรอบก่อน
+            // sessionStats = { wins: 0, losses: 0, pnl: 0 }; // ← ลบออก
+
+            // Reset trade data for new session
+            allTradesData = [];
+            currentTradeData = null;
+            currentTradeDetails = [];
+            updateTradeDataDisplay();
+
+            // Clear trade log table
+            document.querySelector('#logTable tbody').innerHTML = '';
+            document.getElementById('reportSection').style.display = 'block';
+
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'block';
+
+            showStatus(`🚀 Bot Started. Target: ${totalLoops} rounds.`, "info");
+
+            processNextTrade();
+        }
+
+        function stopBot() {
+            isBotRunning = false;
+            showStatus("⏹ Bot Stopped by user.", "warning");
+            document.getElementById('btnStart').style.display = 'block';
+            document.getElementById('btnStop').style.display = 'none';
+        }
+
+        function resetStats() {
+            if (isBotRunning) {
+                showStatus("⚠️ Cannot reset while bot is running!", "warning");
+                return;
+            }
+
+            if (!confirm('Are you sure you want to reset all statistics?')) {
+                return;
+            }
+
+            // Reset all stats
+            sessionStats = { wins: 0, losses: 0, pnl: 0 };
+            allTradesData = [];
+            currentTradeData = null;
+            currentTradeDetails = [];
+            currentLoop = 0;
+
+            // Clear UI
+            document.querySelector('#logTable tbody').innerHTML = '';
+            updateStatsUI();
+            updateTradeDataDisplay();
+
+            showStatus("✅ Statistics reset successfully!", "success");
+            setTimeout(() => {
+                document.getElementById('status').style.display = 'none';
+            }, 2000);
+        }
+
+        // 4. Trade Loop Processor
+        async function processNextTrade() {
+            if (!isBotRunning || currentLoop >= totalLoops) {
+                finishBot();
+                return;
+            }
+
+            currentLoop++;
+            showStatus(`🔄 Processing Round ${currentLoop} / ${totalLoops}...`, "info");
+
+            try {
+                const result = await executeSingleTrade();
+                logTradeResult(result);
+            } catch (e) {
+                console.error("Trade Error", e);
+                logTradeResult({ result: 'ERROR', profit: 0, time: new Date(), asset: 'ERR' });
+            }
+
+            if (isBotRunning && currentLoop < totalLoops) {
+                let d = delaySeconds;
+                const interval = setInterval(() => {
+                    if (!isBotRunning) { clearInterval(interval); return; }
+                    showStatus(`⏳ Waiting ${d}s for next round...`, "info");
+                    d--;
+                    if (d < 0) {
+                        clearInterval(interval);
+                        processNextTrade();
+                    }
+                }, 1000);
+            } else if (currentLoop >= totalLoops) {
+                finishBot();
+            }
+        }
+
+        function finishBot() {
+            isBotRunning = false;
+            showStatus(`🏁 Bot Finished. Total Rounds: ${currentLoop}`, "success");
+
+            const audio = document.getElementById('applauseSound');
+            if (audio) {
+                audio.play().catch(e => console.log("Audio play failed:", e));
+            }
+
+            document.getElementById('btnStart').style.display = 'block';
+            document.getElementById('btnStop').style.display = 'none';
+        }
+
+        // 5. Single Trade Execution Logic
+        function executeSingleTrade() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const symbol = document.getElementById('assetSelect').value;
+                    const growthRate = parseFloat(document.getElementById('growthRate').value);
+                    const stake = parseFloat(document.getElementById('stakeAmount').value);
+                    const targetProfit = parseFloat(document.getElementById('takeProfit').value);
+
+                    // 1. Proposal
+                    const propReq = {
+                        proposal: 1, subscribe: 1, amount: stake, basis: "stake",
+                        contract_type: "ACCU", currency: "USD", symbol: symbol, growth_rate: growthRate
+                    };
+
+                    const propResp = await api.sendAndWait(propReq);
+                    if (propResp.error) throw new Error(propResp.error.message);
+
+                    const proposalId = propResp.proposal.id;
+
+                    // 2. Buy
+                    const buyResp = await api.sendAndWait({ buy: proposalId, price: propResp.proposal.ask_price });
+                    if (buyResp.error) throw new Error(buyResp.error.message);
+
+                    const contractId = buyResp.buy.contract_id;
+                    api.send({ forget: proposalId });
+
+                    // Add Entry Marker
+                    const entryTime = getCurrentChartTime();
+                    const entryPrice = parseFloat(propResp.proposal.spot);
+                    addTradeMarker('entry', entryTime, entryPrice, currentLoop);
+
+                    // Initialize Trade Data Collection
+                    const initHigh = parseFloat(propResp.proposal.contract_details.high_barrier);
+                    const initLow = parseFloat(propResp.proposal.contract_details.low_barrier);
+                    const initGap = !isNaN(initHigh) && !isNaN(initLow) ? Math.min(initHigh - entryPrice, entryPrice - initLow) : 0;
+                    
+                    currentTradeData = {
+                        tradeNo: currentLoop,
+                        entryTime: entryTime,
+                        entryCandleNo: entryTime,
+                        details: []
+                    };
+
+                    currentTradeDetails = [];
+
+                    const initialTick = {
+                        tradeNo: currentLoop,
+                        timeCandle: entryTime,
+                        candleNoOfTrade: entryTime,
+                        tickNo: 0,
+                        profit: "0.00",
+                        highBarrier: initHigh,
+                        lowBarrier: initLow,
+                        gap: initGap.toFixed(4),
+                        open: entryPrice,
+                        high: entryPrice,
+                        low: entryPrice,
+                        close: entryPrice,
+                        winStatus: 'Buy'
+                    };
+                    currentTradeDetails.push(initialTick);
+
+                    // 3. Monitor
+                    api.send({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 });
+
+                    document.getElementById('monitorSection').style.display = 'block';
+
+                    let lastSpot = null;
+                    try {
+                        const initSpot = parseFloat(propResp.proposal.spot);
+                        lastSpot = initSpot;
+
+                        console.log('[executeSingleTrade] Initial barriers from proposal:', { initHigh, initLow });
+                        if (!isNaN(initHigh) && !isNaN(initLow)) {
+                            updateBarriers(initHigh, initLow);
+                        }
+
+                        const tbody = document.querySelector('#monitorTable tbody');
+                        const row = document.createElement('tr');
+                        const rowClass = currentLoop % 2 === 0 ? 'table-active' : '';
+                        if (rowClass) row.classList.add(rowClass);
+
+                        row.innerHTML = `
+                            <td class="text-muted">${currentLoop}</td>
+                            <td><span class="badge badge-sm bg-blue-lt">${String(contractId).substr(0, 8)}...</span></td>
+                            <td class="text-muted">${new Date().toLocaleTimeString()}</td>
+                            <td>${initSpot}</td>
+                            <td>-</td>
+                            <td>0.00</td>
+                            <td>0</td>
+                            <td class="text-success">${initHigh}</td>
+                            <td class="text-danger">${initLow}</td>
+                            <td>${Math.min(initHigh - initSpot, initSpot - initLow).toFixed(4)}</td>
+                        `;
+                        tbody.insertBefore(row, tbody.firstChild);
+                    } catch (e) {
+                        console.warn("Could not pre-fill proposal data", e);
+                    }
+
+                    const monitorHandler = (data) => {
+                        const contract = data.proposal_open_contract;
+                        if (!contract || contract.contract_id !== contractId) return;
+
+                        const profit = parseFloat(contract.profit);
+                        const spot = parseFloat(contract.current_spot);
+
+                        let high = parseFloat(contract.high_barrier);
+                        let low = parseFloat(contract.low_barrier);
+
+                        if (isNaN(high) && contract.contract_details) {
+                            high = parseFloat(contract.contract_details.high_barrier);
+                        }
+                        if (isNaN(low) && contract.contract_details) {
+                            low = parseFloat(contract.contract_details.low_barrier);
+                        }
+
+                        // Record Each Tick Detail
+                        if (currentTradeData && !isNaN(spot) && !contract.is_sold) {
+                            const tickNo = contract.tick_count || 0;
+                            
+                            if (tickNo === 0) {
+                                if (!isNaN(high) && !isNaN(low)) {
+                                    updateBarriers(high, low);
+                                }
+                                return;
+                            }
+
+                            const currentTime = getCurrentChartTime();
+                            
+                            let gap = 0;
+                            if (!isNaN(high) && !isNaN(low)) {
+                                const gapUp = high - spot;
+                                const gapDown = spot - low;
+                                gap = Math.min(gapUp, gapDown);
+                            }
+
+                            let open = currentTradeDetails.length > 0 ? currentTradeDetails[0].open : spot;
+                            let tickHigh = spot;
+                            let tickLow = spot;
+                            
+                            if (currentTradeDetails.length > 0) {
+                                const prevTicks = currentTradeDetails;
+                                tickHigh = Math.max(spot, ...prevTicks.map(t => parseFloat(t.high)));
+                                tickLow = Math.min(spot, ...prevTicks.map(t => parseFloat(t.low)));
+                            }
+
+                            const tickData = {
+                                tradeNo: currentLoop,
+                                timeCandle: currentTime,
+                                candleNoOfTrade: currentTradeData.entryCandleNo,
+                                tickNo: tickNo,
+                                profit: profit.toFixed(2),
+                                highBarrier: !isNaN(high) ? high : null,
+                                lowBarrier: !isNaN(low) ? low : null,
+                                gap: gap.toFixed(4),
+                                open: open,
+                                high: tickHigh,
+                                low: tickLow,
+                                close: spot,
+                                winStatus: 'Wait'
+                            };
+
+                            currentTradeDetails.push(tickData);
+                        }
+
+                        if (!isNaN(high) && !isNaN(low)) {
+                            updateBarriers(high, low);
+                        }
+
+                        const tickCount = contract.tick_count || 0;
+
+                        let gap = '-';
+                        if (!isNaN(spot) && !isNaN(high) && !isNaN(low)) {
+                            const gUp = high - spot;
+                            const gDown = spot - low;
+                            gap = Math.min(gUp, gDown).toFixed(4);
+                        }
+
+                        let change = '-';
+                        let changeColor = 'text-muted';
+                        if (lastSpot !== null && !isNaN(lastSpot) && !isNaN(spot)) {
+                            const diff = spot - lastSpot;
+                            change = diff.toFixed(3);
+                            changeColor = diff > 0 ? 'text-success' : (diff < 0 ? 'text-danger' : 'text-muted');
+                            if (diff > 0) change = '+' + change;
+                        }
+                        if (!isNaN(spot)) lastSpot = spot;
+
+                        const tbody = document.querySelector('#monitorTable tbody');
+                        const row = document.createElement('tr');
+                        const rowClass = currentLoop % 2 === 0 ? 'table-active' : '';
+                        if (rowClass) row.classList.add(rowClass);
+
+                        const profitColor = profit >= 0 ? 'text-success' : 'text-danger';
+
+                        row.innerHTML = `
+                            <td class="text-muted">${currentLoop}</td>
+                            <td><span class="badge badge-sm bg-blue-lt">${String(contractId).substr(0, 8)}...</span></td>
+                            <td class="text-muted">${new Date().toLocaleTimeString()}</td>
+                            <td>${contract.current_spot || '-'}</td>
+                            <td class="${changeColor}">${change}</td>
+                            <td class="${profitColor}">${profit.toFixed(2)}</td>
+                            <td>${tickCount}</td>
+                            <td class="text-success">${contract.high_barrier || '-'}</td>
+                            <td class="text-danger">${contract.low_barrier || '-'}</td>
+                            <td>${gap}</td>
+                        `;
+                        tbody.insertBefore(row, tbody.firstChild);
+
+                        // Auto Sell Logic
+                        const useTickSell = document.getElementById('useTickSell').checked;
+                        const tickTarget = parseInt(document.getElementById('tickSellTarget').value) || 2;
+
+                        let sellTriggered = false;
+                        let sellReason = "";
+
+                        if (useTickSell && tickCount >= tickTarget) {
+                            sellTriggered = true;
+                            sellReason = "TICK_TARGET";
+                        }
+
+                        if (!sellTriggered && profit >= targetProfit) {
+                            sellTriggered = true;
+                            sellReason = "TAKE_PROFIT";
+                        }
+
+                        if (!contract.is_sold && sellTriggered) {
+                            console.log(`[Round ${currentLoop}] SELL TRIGGER: ${sellReason}`);
+                            api.send({ sell: contractId, price: 0 });
+                        }
+
+                        // Check Finish
+                        if (contract.is_sold) {
+                            const exitTime = getCurrentChartTime();
+                            const exitPrice = parseFloat(contract.current_spot || spot);
+                            const finalProfit = parseFloat(contract.profit);
+                            const markerType = finalProfit >= 0 ? 'exit_win' : 'exit_loss';
+                            addTradeMarker(markerType, exitTime, exitPrice, currentLoop);
+
+                            if (currentTradeData && currentTradeDetails.length > 0) {
+                                const finalResult = finalProfit >= 0 ? 'WIN' : 'LOSS';
+                                
+                                const lastIndex = currentTradeDetails.length - 1;
+                                currentTradeDetails[lastIndex].winStatus = finalResult;
+                                currentTradeDetails[lastIndex].close = exitPrice;
+                                currentTradeDetails[lastIndex].profit = finalProfit.toFixed(2);
+                                
+                                const prevHigh = currentTradeDetails[lastIndex].high;
+                                const prevLow = currentTradeDetails[lastIndex].low;
+                                currentTradeDetails[lastIndex].high = Math.max(prevHigh, exitPrice);
+                                currentTradeDetails[lastIndex].low = Math.min(prevLow, exitPrice);
+
+                                allTradesData.push(...currentTradeDetails);
+                                updateTradeDataDisplay();
+                                
+                                console.log(`[Trade Data] Saved ${currentTradeDetails.length} ticks - Result: ${finalResult}`);
+                                currentTradeData = null;
+                                currentTradeDetails = [];
+                            }
+
+                            if (data.subscription) api.send({ forget: data.subscription.id });
+
+                            resolve({
+                                result: finalProfit >= 0 ? "WIN" : "LOSS",
+                                profit: finalProfit,
+                                time: new Date(),
+                                asset: symbol
+                            });
+
+                            updateBarriers(null, null);
+                        }
+                    };
+
+                    api.on('proposal_open_contract', monitorHandler);
+
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        // 6. Logging & UI
+        function logTradeResult(data) {
+            sessionStats.pnl += data.profit;
+            if (data.result === 'WIN') sessionStats.wins++;
+            else if (data.result === 'LOSS') sessionStats.losses++;
+
+            updateStatsUI();
+
+            console.log(`[Round ${currentLoop}] Result: ${data.result}, Profit: ${data.profit}`);
+
+            const tbody = document.querySelector('#logTable tbody');
+            const tr = document.createElement('tr');
+            
+            const resultBadge = data.result === 'WIN' 
+                ? '<span class="badge bg-success">WIN</span>' 
+                : '<span class="badge bg-danger">LOSS</span>';
+            
+            const profitClass = data.profit >= 0 ? 'text-success' : 'text-danger';
+
+            tr.innerHTML = `
+                <td class="text-muted">${currentLoop}</td>
+                <td class="text-muted">${data.time.toLocaleTimeString()}</td>
+                <td>${data.asset}</td>
+                <td>${resultBadge}</td>
+                <td class="${profitClass} fw-bold">${data.profit > 0 ? '+' : ''}${data.profit.toFixed(2)}</td>
+            `;
+            tbody.insertBefore(tr, tbody.firstChild);
+        }
+
+        function updateStatsUI() {
+            document.getElementById('sumTotal').textContent = currentLoop;
+            document.getElementById('sumWin').textContent = sessionStats.wins;
+            document.getElementById('sumLoss').textContent = sessionStats.losses;
+            const pnlEl = document.getElementById('sumPnl');
+            pnlEl.textContent = `$${sessionStats.pnl > 0 ? '+' : ''}${sessionStats.pnl.toFixed(2)}`;
+            pnlEl.className = 'h3 mb-0 ' + (sessionStats.pnl >= 0 ? 'text-success' : 'text-danger');
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.innerHTML = msg;
+            el.className = `alert alert-${type}`;
+            el.style.display = 'block';
+        }
+
+        // Trade Markers
+        function addTradeMarker(type, time, price, tradeNo) {
+            if (!markerSeries) return;
+
+            let markerConfig = {};
+
+            if (type === 'entry') {
+                markerConfig = {
+                    time: time,
+                    position: 'belowBar',
+                    color: '#0ea5e9',
+                    shape: 'arrowUp',
+                    text: `Buy-${tradeNo}`,
+                    size: 1
+                };
+            } else if (type === 'exit_win') {
+                markerConfig = {
+                    time: time,
+                    position: 'aboveBar',
+                    color: '#22c55e',
+                    shape: 'arrowDown',
+                    text: '✅ WIN',
+                    size: 1
+                };
+            } else if (type === 'exit_loss') {
+                markerConfig = {
+                    time: time,
+                    position: 'aboveBar',
+                    color: '#ef4444',
+                    shape: 'arrowDown',
+                    text: '❌ LOSS',
+                    size: 1
+                };
+            }
+
+            tradeMarkers.push(markerConfig);
+            markerSeries.setMarkers(tradeMarkers);
+        }
+
+        function getCurrentChartTime() {
+            if (chartMode === 'ticks') {
+                return tickCounter - 1;
+            } else {
+                return Math.floor(Date.now() / 1000);
+            }
+        }
+
+        function updateTradeDataDisplay() {
+            const textarea = document.getElementById('tradeDataJson');
+            if (textarea) {
+                textarea.value = JSON.stringify(allTradesData, null, 2);
+            }
+        }
+
+        function copyTradeData() {
+            const textarea = document.getElementById('tradeDataJson');
+            textarea.select();
+            document.execCommand('copy');
+            showStatus('📋 JSON data copied to clipboard!', 'success');
+            setTimeout(() => {
+                if (!isBotRunning) {
+                    document.getElementById('status').style.display = 'none';
+                }
+            }, 2000);
+        }
+
+        // Chart Logic
+        function initChart() {
+            if (chart) return;
+
+            const container = document.getElementById('chartContainer');
+            const theme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+            const isDark = theme === 'dark';
+
+            chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: 300,
+                layout: {
+                    background: { type: 'solid', color: isDark ? '#1a1a1a' : '#ffffff' },
+                    textColor: isDark ? '#d4d4d4' : '#212529',
+                },
+                grid: {
+                    vertLines: { color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                    horzLines: { color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)' },
+                },
+                rightPriceScale: {
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                },
+                timeScale: {
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+                    timeVisible: true,
+                    secondsVisible: true,
+                },
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#22c55e',
+                downColor: '#ef4444',
+                borderDownColor: '#ef4444',
+                borderUpColor: '#22c55e',
+                wickDownColor: '#ef4444',
+                wickUpColor: '#22c55e',
+            });
+
+            markerSeries = candleSeries;
+
+            if (typeof BackgroundColorZonesPlugin !== 'undefined') {
+                barrierZonePlugin = new BackgroundColorZonesPlugin(candleSeries, []);
+                console.log('[initChart] ✅ BackgroundColorZonesPlugin initialized');
+            } else {
+                console.warn('[initChart] ⚠️ BackgroundColorZonesPlugin not available!');
+            }
+
+            new ResizeObserver(entries => {
+                if (entries.length === 0 || !entries[0].contentRect) return;
+                const newRect = entries[0].contentRect;
+                chart.applyOptions({ width: newRect.width, height: newRect.height });
+            }).observe(container);
+        }
+
+        async function changeChartAsset() {
+            const asset = document.getElementById('chartAssetSelect').value;
+            
+            // Clear markers when changing asset
+            tradeMarkers = [];
+            if (markerSeries) markerSeries.setMarkers([]);
+            
+            await subscribeChart(asset);
+        }
+
+        async function changeChartMode(mode) {
+            chartMode = mode;
+            const asset = document.getElementById('chartAssetSelect').value;
+            await subscribeChart(asset);
+        }
+
+        async function subscribeChart(asset) {
+            if (!api || !isAuthorized) return;
+
+            if (currentChartSubscriptionId) {
+                api.send({ forget: currentChartSubscriptionId });
+                currentChartSubscriptionId = null;
+            }
+
+            if (candleSeries) candleSeries.setData([]);
+            tickCounter = 0;
+
+            let req = {};
+            if (chartMode === 'candles') {
+                req = {
+                    ticks_history: asset,
+                    adjust_start_time: 1,
+                    count: 100,
+                    end: "latest",
+                    style: "candles",
+                    granularity: 60,
+                    subscribe: 1
+                };
+            } else {
+                req = {
+                    ticks_history: asset,
+                    adjust_start_time: 1,
+                    count: 100,
+                    end: "latest",
+                    style: "ticks",
+                    subscribe: 1
+                };
+            }
+
+            try {
+                if (!api.hasChartListener) {
+                    setupChartListener();
+                    api.hasChartListener = true;
+                }
+                api.send(req);
+            } catch (e) {
+                console.error("Chart Sub Error", e);
+            }
+        }
+
+        function setupChartListener() {
+            api.on('candles', (data) => {
+                if (chartMode !== 'candles') return;
+                if (data.echo_req.style === 'candles' && data.candles) {
+                    const formatted = data.candles.map(c => ({
+                        time: c.epoch,
+                        open: parseFloat(c.open),
+                        high: parseFloat(c.high),
+                        low: parseFloat(c.low),
+                        close: parseFloat(c.close)
+                    }));
+                    if (candleSeries) candleSeries.setData(formatted);
+
+                    if (data.candles.length > 0) {
+                        const last = data.candles[data.candles.length - 1];
+                        updateChartMetadata(last);
+                    }
+                }
+            });
+
+            api.on('ohlc', (data) => {
+                if (chartMode !== 'candles') return;
+                if (data.ohlc) {
+                    const c = data.ohlc;
+                    const candle = {
+                        time: c.open_time,
+                        open: parseFloat(c.open),
+                        high: parseFloat(c.high),
+                        low: parseFloat(c.low),
+                        close: parseFloat(c.close)
+                    };
+                    if (candleSeries) candleSeries.update(candle);
+                    updateChartMetadata(c);
+                    if (data.subscription) currentChartSubscriptionId = data.subscription.id;
+                }
+            });
+
+            api.on('history', (data) => {
+                if (chartMode !== 'ticks') return;
+                if (data.history && data.history.times) {
+                    const prices = data.history.prices;
+                    const formatted = [];
+                    for (let i = 0; i < prices.length; i++) {
+                        const val = parseFloat(prices[i]);
+                        const prevVal = i > 0 ? parseFloat(prices[i - 1]) : val;
+
+                        formatted.push({
+                            time: i,
+                            open: prevVal,
+                            high: Math.max(prevVal, val),
+                            low: Math.min(prevVal, val),
+                            close: val
+                        });
+                    }
+
+                    tickCounter = formatted.length;
+                    if (candleSeries) candleSeries.setData(formatted);
+
+                    if (formatted.length > 0) {
+                        const last = formatted[formatted.length - 1];
+                        updateChartMetadata(last);
+                        chart.lastTickPrice = last.close;
+                    }
+                }
+            });
+
+            api.on('tick', (data) => {
+                if (chartMode !== 'ticks') return;
+                if (data.tick) {
+                    const val = parseFloat(data.tick.quote);
+                    const prevVal = (typeof chart.lastTickPrice !== 'undefined') ? chart.lastTickPrice : val;
+
+                    const candle = {
+                        time: tickCounter,
+                        open: prevVal,
+                        high: Math.max(prevVal, val),
+                        low: Math.min(prevVal, val),
+                        close: val
+                    };
+
+                    if (candleSeries) candleSeries.update(candle);
+
+                    tickCounter++;
+                    chart.lastTickPrice = val;
+
+                    updateChartMetadata(candle);
+                    if (data.subscription) currentChartSubscriptionId = data.subscription.id;
+                }
+            });
+        }
+
+        function updateChartMetadata(candle) {
+            const h = parseFloat(candle.high);
+            const l = parseFloat(candle.low);
+            const diff = Math.abs(h - l);
+
+            document.getElementById('valHigh').textContent = h.toFixed(3);
+            document.getElementById('valLow').textContent = l.toFixed(3);
+            document.getElementById('valDiff').textContent = diff.toFixed(3);
+        }
+
+        function toggleChart() {
+            const wrapper = document.getElementById('chartWrapper');
+            const icon = document.getElementById('chartToggleIcon');
+            if (wrapper.style.display === 'none') {
+                wrapper.style.display = 'block';
+                icon.className = 'ti ti-eye-off';
+            } else {
+                wrapper.style.display = 'none';
+                icon.className = 'ti ti-eye';
+            }
+        }
+
+        let tradeStartRef = null;
+
+        function updateBarriers(high, low) {
+            if (!candleSeries) return;
+
+            if (highBarrierLine) {
+                candleSeries.removePriceLine(highBarrierLine);
+                highBarrierLine = null;
+            }
+            if (high !== null && !isNaN(high)) {
+                highBarrierLine = candleSeries.createPriceLine({
+                    price: parseFloat(high),
+                    color: '#ef4444',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'High Barrier',
+                });
+            }
+
+            if (lowBarrierLine) {
+                candleSeries.removePriceLine(lowBarrierLine);
+                lowBarrierLine = null;
+            }
+            if (low !== null && !isNaN(low)) {
+                lowBarrierLine = candleSeries.createPriceLine({
+                    price: parseFloat(low),
+                    color: '#22c55e',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: 'Low Barrier',
+                });
+            }
+
+            if (!barrierZonePlugin) return;
+
+            if (high !== null && low !== null && !isNaN(high) && !isNaN(low)) {
+                const timeScale = chart.timeScale();
+                const visibleRange = timeScale.getVisibleLogicalRange();
+                
+                let startTime, endTime;
+
+                if (chartMode === 'ticks') {
+                    if (visibleRange) {
+                        startTime = Math.max(0, Math.floor(visibleRange.from));
+                        endTime = Math.ceil(visibleRange.to) + 50;
+                    } else {
+                        startTime = Math.max(0, tickCounter - 50);
+                        endTime = tickCounter + 100;
+                    }
+                } else {
+                    const now = Math.floor(Date.now() / 1000);
+                    startTime = now - 300;
+                    endTime = now + 600;
+                }
+
+                const zones = [{
+                    startTime: startTime,
+                    endTime: endTime,
+                    priceTop: parseFloat(high),
+                    priceBottom: parseFloat(low),
+                    color: 'rgba(251, 191, 36, 0.15)',
+                    borderColor: 'rgba(251, 191, 36, 0.4)'
+                }];
+
+                try {
+                    if (typeof barrierZonePlugin.updateZones === 'function') {
+                        barrierZonePlugin.updateZones(zones);
+                    } else if (typeof barrierZonePlugin.setZones === 'function') {
+                        barrierZonePlugin.setZones(zones);
+                    } else if (typeof barrierZonePlugin.update === 'function') {
+                        barrierZonePlugin.update(zones);
+                    } else if (typeof barrierZonePlugin.setData === 'function') {
+                        barrierZonePlugin.setData(zones);
+                    }
+                } catch (e) {
+                    console.error('[updateBarriers] Error calling plugin:', e);
+                }
+
+            } else {
+                try {
+                    if (typeof barrierZonePlugin.updateZones === 'function') {
+                        barrierZonePlugin.updateZones([]);
+                    } else if (typeof barrierZonePlugin.setZones === 'function') {
+                        barrierZonePlugin.setZones([]);
+                    } else if (typeof barrierZonePlugin.clear === 'function') {
+                        barrierZonePlugin.clear();
+                    } else if (typeof barrierZonePlugin.setData === 'function') {
+                        barrierZonePlugin.setData([]);
+                    }
+                } catch (e) {
+                    console.error('[updateBarriers] Error clearing zones:', e);
+                }
+                tradeStartRef = null;
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

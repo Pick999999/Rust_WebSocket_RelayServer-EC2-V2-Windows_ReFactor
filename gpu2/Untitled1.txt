@@ -1,0 +1,13 @@
+ไฟล์  public/trade_dashboard.html
+เพิ่ม รายการ asset 
+<div class="flex-row" style="margin-bottom:6px;">
+    <div class="cb-group flex-row"><label><input type="checkbox" class="cbAsset" value="R_10"><span>R_10</span></label><label><input type="checkbox" class="cbAsset" value="R_25"><span>R_25</span></label><label><input type="checkbox" class="cbAsset" value="R_50" checked=""><span>R_50</span></label><label><input type="checkbox" class="cbAsset" value="R_75"><span>R_75</span></label><label><input type="checkbox" class="cbAsset" value="R_100"><span>R_100</span></label><label><input type="checkbox" class="cbAsset" value="1HZ10V"><span>1HZ10V</span></label><label><input type="checkbox" class="cbAsset" value="1HZ25V"><span>1HZ25V</span></label><label><input type="checkbox" class="cbAsset" value="1HZ50V"><span>1HZ50V</span></label><label><input type="checkbox" class="cbAsset" value="1HZ75V"><span>1HZ75V</span></label><label><input type="checkbox" class="cbAsset" value="1HZ100V"><span>1HZ100V</span></label></div>
+</div>
+
+เข้าไปใน page เพื่อให้สามารถ tick เลือก asset ได้หลายๆ รายการ
+โดย รายการที่ถูกเลือก จะถูกนำไป คำนวณหา  AnalysisResult ด้วย  lib.rs ที่อยู่ใน 
+RustLib/indicator_math โดยให้ยกเลิก  การใช้ indicator_math จาก folder 
+D:\Rust\RustAndSocket\Rust_WebSocket_RelayServer-EC2-V2-Windows\indicator_math 
+โดยจุดประสงค์คือ ต้องการคำนวณแบบ Pararell แทน และเมื่อถึง วินาทีที่ 0 ของ timeframe ที่กำหนดไว้ ก็ให้นำ 
+StatusCode ของ AnalysisResult ของ asset แต่ละอันมา หาว่า จะใช้ call,put หรือ Idle
+เพื่อส่งไปเทรด deriv.com แบบ rise/fall ตามเงื่อนไขที่ได้กำหนดไว้ใน หน้าเพจ  trade_dashboard.html

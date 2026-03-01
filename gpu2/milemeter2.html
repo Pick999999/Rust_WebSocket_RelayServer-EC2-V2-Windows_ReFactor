@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Advanced Gauges</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #1e1b4b 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .gauge-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .gauge-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .gauge-title {
+            text-align: center;
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Gauge 7: Liquid Fill Gauge */
+        .gauge-liquid {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 5px solid #333;
+            background: linear-gradient(180deg, #e0f2fe, #f0f9ff);
+        }
+
+        .liquid {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(180deg, #06b6d4, #0891b2);
+            transition: height 1s ease;
+        }
+
+        .wave {
+            position: absolute;
+            top: -100px;
+            left: -100%;
+            width: 200%;
+            height: 100px;
+            background: rgba(6, 182, 212, 0.5);
+            border-radius: 45%;
+            animation: wave 3s infinite linear;
+        }
+
+        .wave:nth-child(2) {
+            animation: wave 4s infinite linear;
+            opacity: 0.5;
+        }
+
+        @keyframes wave {
+            0% { transform: translateX(0) translateY(0); }
+            50% { transform: translateX(-25%) translateY(-10px); }
+            100% { transform: translateX(-50%) translateY(0); }
+        }
+
+        .gauge-liquid .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #333;
+            z-index: 10;
+            text-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+
+        /* Gauge 8: 3D Cylinder */
+        .gauge-cylinder {
+            position: relative;
+            width: 120px;
+            height: 250px;
+            margin: 0 auto;
+            perspective: 1000px;
+        }
+
+        .cylinder-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .cylinder-back {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #e5e7eb, #f3f4f6, #e5e7eb);
+            border-radius: 60px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .cylinder-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6);
+            border-radius: 60px;
+            transition: height 1s ease;
+            box-shadow: 0 -5px 20px rgba(59, 130, 246, 0.6);
+        }
+
+        .cylinder-top {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 20px;
+            background: linear-gradient(180deg, #f3f4f6, #e5e7eb);
+            border-radius: 50%;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+        }
+
+        .cylinder-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            font-weight: bold;
+            color: white;
+            z-index: 10;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Gauge 9: Radial Progress with Glow */
+        .gauge-radial {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+        }
+
+        .gauge-radial svg {
+            transform: rotate(-90deg);
+            filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+        }
+
+        .radial-bg {
+            fill: none;
+            stroke: #e5e7eb;
+            stroke-width: 15;
+        }
+
+        .radial-progress {
+            fill: none;
+            stroke-width: 15;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .radial-glow {
+            fill: none;
+            stroke-width: 25;
+            stroke-linecap: round;
+            opacity: 0.3;
+            filter: blur(5px);
+        }
+
+        /* Gauge 10: Multiple Rings */
+        .gauge-rings {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
+        }
+
+        .gauge-rings svg {
+            transform: rotate(-90deg);
+        }
+
+        /* Gauge 11: Thermometer Style */
+        .gauge-thermometer {
+            position: relative;
+            width: 80px;
+            height: 280px;
+            margin: 0 auto;
+        }
+
+        .thermo-bulb {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+
+        .thermo-tube {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 240px;
+            background: linear-gradient(90deg, #e5e7eb, #f3f4f6, #e5e7eb);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .thermo-mercury {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(180deg, #fca5a5, #ef4444, #dc2626);
+            transition: height 1s ease;
+        }
+
+        .thermo-scale {
+            position: absolute;
+            right: -40px;
+            top: 20px;
+            height: 200px;
+        }
+
+        .scale-mark {
+            position: relative;
+            height: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Gauge 12: Heart Rate Monitor */
+        .gauge-heartbeat {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background: #0f172a;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .heartbeat-line {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .pulse-line {
+            stroke: #10b981;
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(0 0 5px #10b981);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .heartbeat-value {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #10b981;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .heartbeat-label {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            font-size: 1em;
+            color: #94a3b8;
+        }
+
+        /* Gauge 13: Speedometer Digital */
+        .gauge-digital {
+            position: relative;
+            width: 250px;
+            height: 180px;
+            margin: 0 auto;
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .digital-display {
+            font-family: 'Courier New', monospace;
+            font-size: 4em;
+            font-weight: bold;
+            text-align: center;
+            color: #3b82f6;
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+            margin-bottom: 10px;
+        }
+
+        .digital-bars {
+            display: flex;
+            justify-content: space-between;
+            height: 40px;
+            gap: 3px;
+        }
+
+        .digital-bar {
+            flex: 1;
+            background: #334155;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .digital-bar.active {
+            background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Gauge 14: Animated Dots Circle */
+        .gauge-dots {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        .dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 50%;
+            transform-origin: 100px 100px;
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+            transform: scale(1.3);
+        }
+
+        .gauge-dots .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        input[type="range"] {
+            width: 80%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            border: none;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 10px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .gauge-label {
+            text-align: center;
+            font-size: 1em;
+            color: #666;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Dashboard - Advanced Gauges</h1>
+        
+        <div class="dashboard-grid">
+            <!-- Gauge 7: Liquid Fill -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 7: Liquid Fill Gauge</div>
+                <div class="gauge-liquid" id="gauge7">
+                    <div class="liquid" id="liquid7" style="height: 0%">
+                        <div class="wave"></div>
+                        <div class="wave"></div>
+                    </div>
+                    <div class="gauge-value" id="value7">0%</div>
+                </div>
+                <div class="gauge-label">Water Level</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider7">
+                </div>
+            </div>
+
+            <!-- Gauge 8: 3D Cylinder -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 8: 3D Cylinder Gauge</div>
+                <div class="gauge-cylinder">
+                    <div class="cylinder-container">
+                        <div class="cylinder-top"></div>
+                        <div class="cylinder-back">
+                            <div class="cylinder-fill" id="cylinder8" style="height: 0%"></div>
+                            <div class="cylinder-value" id="value8">0%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="gauge-label">Fuel Tank</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider8">
+                </div>
+            </div>
+
+            <!-- Gauge 9: Radial with Glow -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 9: Radial Glow Progress</div>
+                <div class="gauge-radial">
+                    <svg width="220" height="220" viewBox="0 0 220 220">
+                        <circle cx="110" cy="110" r="90" class="radial-bg"/>
+                        <circle id="glow9" cx="110" cy="110" r="90" 
+                                class="radial-glow"
+                                stroke="#8b5cf6"
+                                stroke-dasharray="565.48"
+                                stroke-dashoffset="565.48"/>
+                        <circle id="progress9" cx="110" cy="110" r="90" 
+                                class="radial-progress"
+                                stroke="#8b5cf6"
+                                stroke-dasharray="565.48"
+                                stroke-dashoffset="565.48"/>
+                    </svg>
+                    <div class="gauge-value" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5em; font-weight: bold;" id="value9">0%</div>
+                    <div class="gauge-label" style="position: absolute; top: 65%; left: 50%; transform: translateX(-50%);">Loading</div>
+                </div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider9">
+                </div>
+            </div>
+
+            <!-- Gauge 10: Multiple Rings -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 10: Multi-Ring Progress</div>
+                <div class="gauge-rings">
+                    <svg width="220" height="220" viewBox="0 0 220 220">
+                        <!-- Ring 1 -->
+                        <circle cx="110" cy="110" r="95" fill="none" stroke="#e5e7eb" stroke-width="12"/>
+                        <circle id="ring10-1" cx="110" cy="110" r="95" 
+                                fill="none" stroke="#ef4444" stroke-width="12"
+                                stroke-dasharray="596.9"
+                                stroke-dashoffset="596.9"
+                                stroke-linecap="round"/>
+                        <!-- Ring 2 -->
+                        <circle cx="110" cy="110" r="75" fill="none" stroke="#e5e7eb" stroke-width="12"/>
+                        <circle id="ring10-2" cx="110" cy="110" r="75" 
+                                fill="none" stroke="#f59e0b" stroke-width="12"
+                                stroke-dasharray="471.2"
+                                stroke-dashoffset="471.2"
+                                stroke-linecap="round"/>
+                        <!-- Ring 3 -->
+                        <circle cx="110" cy="110" r="55" fill="none" stroke="#e5e7eb" stroke-width="12"/>
+                        <circle id="ring10-3" cx="110" cy="110" r="55" 
+                                fill="none" stroke="#10b981" stroke-width="12"
+                                stroke-dasharray="345.6"
+                                stroke-dashoffset="345.6"
+                                stroke-linecap="round"/>
+                    </svg>
+                    <div class="gauge-value" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5em; font-weight: bold;" id="value10">0%</div>
+                </div>
+                <div class="gauge-label">System Resources</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider10">
+                </div>
+            </div>
+
+            <!-- Gauge 11: Thermometer -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 11: Thermometer Style</div>
+                <div class="gauge-thermometer">
+                    <div class="thermo-tube">
+                        <div class="thermo-mercury" id="mercury11" style="height: 0%"></div>
+                    </div>
+                    <div class="thermo-bulb"></div>
+                    <div class="thermo-scale">
+                        <div class="scale-mark" style="top: 0">100°</div>
+                        <div class="scale-mark" style="top: 50px">75°</div>
+                        <div class="scale-mark" style="top: 100px">50°</div>
+                        <div class="scale-mark" style="top: 150px">25°</div>
+                        <div class="scale-mark" style="top: 200px">0°</div>
+                    </div>
+                </div>
+                <div class="gauge-value" style="text-align: center; margin-top: 20px; font-size: 2em; font-weight: bold; color: #ef4444;" id="value11">0°C</div>
+                <div class="gauge-label">Temperature</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider11">
+                </div>
+            </div>
+
+            <!-- Gauge 12: Heart Rate Monitor -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 12: Heart Rate Monitor</div>
+                <div class="gauge-heartbeat">
+                    <svg class="heartbeat-line" viewBox="0 0 400 200">
+                        <path id="heartPath12" class="pulse-line" d="M0,100 L50,100 L70,80 L80,120 L90,60 L100,100 L400,100"/>
+                    </svg>
+                    <div class="heartbeat-value" id="value12">0</div>
+                    <div class="heartbeat-label">BPM</div>
+                </div>
+                <div class="gauge-label">Heart Rate</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider12">
+                </div>
+            </div>
+
+            <!-- Gauge 13: Digital Speedometer -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 13: Digital Display</div>
+                <div class="gauge-digital">
+                    <div class="digital-display" id="value13">000</div>
+                    <div class="gauge-label" style="color: #94a3b8; margin-bottom: 10px;">KM/H</div>
+                    <div class="digital-bars" id="bars13">
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                        <div class="digital-bar"></div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider13">
+                </div>
+            </div>
+
+            <!-- Gauge 14: Animated Dots -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 14: Animated Dots Circle</div>
+                <div class="gauge-dots" id="gauge14">
+                    <!-- Dots will be created by JavaScript -->
+                    <div class="gauge-value" id="value14">0%</div>
+                </div>
+                <div class="gauge-label">Progress Indicator</div>
+                <div class="controls">
+                    <input type="range" min="0" max="100" value="0" id="slider14">
+                </div>
+            </div>
+        </div>
+
+        <div class="gauge-card">
+            <div class="gauge-title">🎮 Control Panel</div>
+            <div style="text-align: center;">
+                <button onclick="setAllGauges(0)">Reset (0%)</button>
+                <button onclick="setAllGauges(25)">25%</button>
+                <button onclick="setAllGauges(50)">50%</button>
+                <button onclick="setAllGauges(75)">75%</button>
+                <button onclick="setAllGauges(100)">100%</button>
+                <button onclick="animateRandom()">🎲 Random</button>
+                <button onclick="animateSequence()">▶️ Sequence</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Gauge 14 dots
+        function initDots() {
+            const container = document.getElementById('gauge14');
+            const numDots = 30;
+            const radius = 90;
+            
+            for (let i = 0; i < numDots; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                const angle = (i / numDots) * 360;
+                const x = 100 + radius * Math.cos((angle - 90) * Math.PI / 180);
+                const y = 100 + radius * Math.sin((angle - 90) * Math.PI / 180);
+                dot.style.left = x + 'px';
+                dot.style.top = y + 'px';
+                dot.dataset.index = i;
+                container.appendChild(dot);
+            }
+        }
+        initDots();
+
+        // Update Gauge 7: Liquid Fill
+        function updateGauge7(value) {
+            document.getElementById('liquid7').style.height = value + '%';
+            document.getElementById('value7').textContent = value + '%';
+            document.getElementById('slider7').value = value;
+        }
+
+        // Update Gauge 8: 3D Cylinder
+        function updateGauge8(value) {
+            document.getElementById('cylinder8').style.height = value + '%';
+            document.getElementById('value8').textContent = value + '%';
+            document.getElementById('slider8').value = value;
+        }
+
+        // Update Gauge 9: Radial Glow
+        function updateGauge9(value) {
+            const circumference = 565.48;
+            const offset = circumference - (value / 100) * circumference;
+            document.getElementById('progress9').style.strokeDashoffset = offset;
+            document.getElementById('glow9').style.strokeDashoffset = offset;
+            document.getElementById('value9').textContent = value + '%';
+            document.getElementById('slider9').value = value;
+        }
+
+        // Update Gauge 10: Multi-Ring
+        function updateGauge10(value) {
+            const ring1 = 596.9 - (value / 100) * 596.9;
+            const ring2 = 471.2 - (value / 100) * 471.2;
+            const ring3 = 345.6 - (value / 100) * 345.6;
+            
+            document.getElementById('ring10-1').style.strokeDashoffset = ring1;
+            document.getElementById('ring10-2').style.strokeDashoffset = ring2;
+            document.getElementById('ring10-3').style.strokeDashoffset = ring3;
+            document.getElementById('value10').textContent = value + '%';
+            document.getElementById('slider10').value = value;
+        }
+
+        // Update Gauge 11: Thermometer
+        function updateGauge11(value) {
+            document.getElementById('mercury11').style.height = value + '%';
+            document.getElementById('value11').textContent = value + '°C';
+            document.getElementById('slider11').value = value;
+        }
+
+        // Update Gauge 12: Heart Rate
+        function updateGauge12(value) {
+            const bpm = Math.round(60 + (value / 100) * 140); // 60-200 BPM
+            document.getElementById('value12').textContent = bpm;
+            document.getElementById('slider12').value = value;
+            
+            // Adjust animation speed based on value
+            const heartPath = document.getElementById('heartPath12');
+            const duration = 2 - (value / 100) * 1.5; // 2s to 0.5s
+            heartPath.style.animation = `pulse ${duration}s infinite`;
+        }
+
+        // Update Gauge 13: Digital Display
+        function updateGauge13(value) {
+            const speed = Math.round((value / 100) * 240); // 0-240 km/h
+            document.getElementById('value13').textContent = speed.toString().padStart(3, '0');
+            document.getElementById('slider13').value = value;
+            
+            // Update bars
+            const bars = document.querySelectorAll('#bars13 .digital-bar');
+            const activeBars = Math.round((value / 100) * bars.length);
+            bars.forEach((bar, index) => {
+                if (index < activeBars) {
+                    bar.classList.add('active');
+                } else {
+                    bar.classList.remove('active');
+                }
+            });
+        }
+
+        // Update Gauge 14: Dots Circle
+        function updateGauge14(value) {
+            const dots = document.querySelectorAll('#gauge14 .dot');
+            const activeDots = Math.round((value / 100) * dots.length);
+            
+            dots.forEach((dot, index) => {
+                if (index < activeDots) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+            
+            document.getElementById('value14').textContent = value + '%';
+            document.getElementById('slider14').value = value;
+        }
+
+        // Event listeners
+        document.getElementById('slider7').addEventListener('input', (e) => updateGauge7(parseInt(e.target.value)));
+        document.getElementById('slider8').addEventListener('input', (e) => updateGauge8(parseInt(e.target.value)));
+        document.getElementById('slider9').addEventListener('input', (e) => updateGauge9(parseInt(e.target.value)));
+        document.getElementById('slider10').addEventListener('input', (e) => updateGauge10(parseInt(e.target.value)));
+        document.getElementById('slider11').addEventListener('input', (e) => updateGauge11(parseInt(e.target.value)));
+        document.getElementById('slider12').addEventListener('input', (e) => updateGauge12(parseInt(e.target.value)));
+        document.getElementById('slider13').addEventListener('input', (e) => updateGauge13(parseInt(e.target.value)));
+        document.getElementById('slider14').addEventListener('input', (e) => updateGauge14(parseInt(e.target.value)));
+
+        // Control functions
+        function setAllGauges(value) {
+            updateGauge7(value);
+            updateGauge8(value);
+            updateGauge9(value);
+            updateGauge10(value);
+            updateGauge11(value);
+            updateGauge12(value);
+            updateGauge13(value);
+            updateGauge14(value);
+        }
+
+        function animateRandom() {
+            for (let i = 7; i <= 14; i++) {
+                const value = Math.floor(Math.random() * 101);
+                eval(`updateGauge${i}(${value})`);
+            }
+        }
+
+        function animateSequence() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 2;
+                if (progress > 100) {
+                    progress = 0;
+                }
+                setAllGauges(progress);
+            }, 50);
+            
+            setTimeout(() => clearInterval(interval), 3000);
+        }
+
+        // Demo animation on load
+        setTimeout(() => {
+            animateRandom();
+        }, 500);
+    </script>
+</body>
+</html>

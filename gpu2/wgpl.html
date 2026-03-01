@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Multi-Asset Trader</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #131722;
+            color: #d1d4dc;
+            font-family: sans-serif;
+        }
+
+        .panel {
+            padding: 15px 20px;
+            background: #1e222d;
+            border-bottom: 1px solid #2b2b43;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input {
+            background: #2a2e39;
+            border: 1px solid #363c4e;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            width: 250px;
+        }
+
+        button {
+            background: #2962ff;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #1e4bd8;
+        }
+
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        #chart {
+            width: 100%;
+            height: calc(100vh - 80px);
+        }
+
+        .log {
+            font-size: 12px;
+            color: #848e9c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="panel">
+        <div>
+            <label>Assets (แยกด้วย ,): </label>
+            <input type="text" id="assetInput" value="R_10,R_25,R_50,R_100" placeholder="เช่น R_10,R_100">
+        </div>
+        <button id="startBtn">เริ่มดึงข้อมูลและคำนวณ</button>
+        <div id="status" class="log">พร้อมทำงาน...</div>
+    </div>
+    <div id="chart"></div>
+
+    <script type="module">
+        // --- 1. WGSL Compute Shader ---
+        const shaderCode = `
+            @group(0) @binding(0) var<storage, read> input_data: array<f32>;
+            @group(0) @binding(1) var<storage, read_write> output_ema: array<f32>;
+            @compute @workgroup_size(1)
+            fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+                let alpha: f32 = 2.0 / (14.0 + 1.0); 
+                output_ema[0] = input_data[0];
+                for (var i: u32 = 1u; i < arrayLength(&input_data); i++) {
+                    output_ema[i] = (input_data[i] * alpha) + (output_ema[i - 1u] * (1.0 - alpha));
+                }
+            }
+        `;
+
+        // --- 2. Chart Setup ---
+        const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+            layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#2b2b43' }, horzLines: { color: '#2b2b43' } },
+        });
+        const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries);
+        const emaSeries = chart.addSeries(LightweightCharts.LineSeries, { color: '#2962FF', lineWidth: 2 });
+
+        // --- 3. WebGPU Compute Function ---
+        async function runWebGPU(prices) {
+            if (!navigator.gpu) return null;
+            const adapter = await navigator.gpu.requestAdapter();
+            const device = await adapter.requestDevice();
+            const shaderModule = device.createShaderModule({ code: shaderCode });
+            const input = new Float32Array(prices);
+            const inputBuffer = device.createBuffer({ size: input.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC, mappedAtCreation: true });
+            new Float32Array(inputBuffer.getMappedRange()).set(input);
+            inputBuffer.unmap();
+            const outputBuffer = device.createBuffer({ size: input.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+            const bindGroupLayout = device.createBindGroupLayout({
+                entries: [
+                    { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+                    { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } }
+                ]
+            });
+            const bindGroup = device.createBindGroup({
+                layout: bindGroupLayout, entries: [
+                    { binding: 0, resource: { buffer: inputBuffer } },
+                    { binding: 1, resource: { buffer: outputBuffer } }
+                ]
+            });
+            const pipeline = device.createComputePipeline({
+                layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
+                compute: { module: shaderModule, entryPoint: "main" }
+            });
+            const encoder = device.createCommandEncoder();
+            const pass = encoder.beginComputePass();
+            pass.setPipeline(pipeline); pass.setBindGroup(0, bindGroup); pass.dispatchWorkgroups(1); pass.end();
+            const readBuffer = device.createBuffer({ size: input.byteLength, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+            encoder.copyBufferToBuffer(outputBuffer, 0, readBuffer, 0, input.byteLength);
+            device.queue.submit([encoder.finish()]);
+            await readBuffer.mapAsync(GPUMapMode.READ);
+            const result = new Float32Array(readBuffer.getMappedRange()).slice();
+            readBuffer.unmap();
+            return result;
+        }
+
+        // --- 4. Main Process ---
+        const startBtn = document.getElementById('startBtn');
+        const assetInput = document.getElementById('assetInput');
+        const status = document.getElementById('status');
+
+        startBtn.addEventListener('click', async () => {
+            const assets = assetInput.value.split(',').map(a => a.trim());
+            startBtn.disabled = true;
+
+            for (const asset of assets) {
+                status.innerText = `กำลังดึงข้อมูล: ${asset}...`;
+                try {
+                    const data = await fetchDerivData(asset);
+                    if (data) {
+                        candleSeries.setData(data);
+                        const closePrices = data.map(d => d.close);
+                        const emaResults = await runWebGPU(closePrices);
+                        if (emaResults) {
+                            emaSeries.setData(data.map((d, i) => ({ time: d.time, value: emaResults[i] })));
+                        }
+                        chart.timeScale().fitContent();
+                        status.innerText = `แสดงผล: ${asset} (WebGPU คำนวณเสร็จสิ้น)`;
+                    }
+                    // พักสักครู่ก่อนเปลี่ยนตัวถัดไป
+                    await new Promise(r => setTimeout(r, 2000));
+                } catch (e) {
+                    console.error(e);
+                    status.innerText = `Error: ${asset}`;
+                }
+            }
+            startBtn.disabled = false;
+            status.innerText = "ดึงข้อมูลครบทุก Asset แล้ว";
+        });
+
+        async function fetchDerivData(symbol) {
+            return new Promise((resolve) => {
+                const ws = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({
+                        ticks_history: symbol,
+                        count: 500,
+                        end: "latest",
+                        style: "candles",
+                        granularity: 60
+                    }));
+                };
+                ws.onmessage = (msg) => {
+                    const res = JSON.parse(msg.data);
+                    if (res.candles) {
+                        resolve(res.candles.map(c => ({
+                            time: c.epoch, open: c.open, high: c.high, low: c.low, close: c.close
+                        })));
+                        ws.close();
+                    }
+                };
+            });
+        }
+    </script>
+</body>
+
+</html>

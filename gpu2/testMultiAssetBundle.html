@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MultiAssetBundle Test</title>
+    <!-- GPU.js is required -->
+    <script src="https://cdn.jsdelivr.net/npm/gpu.js@latest/dist/gpu-browser.min.js"></script>
+    <script src="MultiAssetBundle.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            background: #111;
+            color: #0f0;
+            padding: 20px;
+        }
+
+        button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>MultiAssetBundle Test</h1>
+    <button onclick="runTest()">Run Analysis</button>
+    <div id="output"></div>
+
+    <script>
+        async function runTest() {
+            const output = document.getElementById('output');
+            output.innerHTML = "Initializing...";
+
+            const manager = new MultiAssetManager("1089");
+
+            // Example Parameters
+            const params = {
+                assets: ["R_50", "R_100"],
+                latest: 100, // Fetch latest 100 candles
+                duration: 1, // 1 minute candles
+                durationUnit: 'm',
+                useSuperKernel: true
+            };
+
+            try {
+                const result = await manager.execute(params);
+                output.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+            } catch (error) {
+                output.innerHTML = "Error: " + error.message;
+            }
+        }
+    </script>
+</body>
+
+</html>

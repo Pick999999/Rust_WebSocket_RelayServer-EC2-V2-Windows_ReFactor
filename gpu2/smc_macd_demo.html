@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMC & Analysis V2 Demo (with MACD)</title>
+    <!-- Lightweight Charts (Fixed Version) -->
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+
+    <!-- 1. Deriv API -->
+    <script src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/deriv-api.js"></script>
+
+    <!-- 2. Basic Indicators -->
+    <script src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/indicators.js"></script>
+
+    <!-- 3. SMC Indicator -->
+    <script
+        src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/SMCIndicator.standalone.js"></script>
+
+    <!-- 4. WebGPU (Optional) -->
+    <script src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/webgpu-indicators.js"></script>
+
+    <!-- 5. Asset Loader -->
+    <script src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/multi-asset-loader.js"></script>
+
+    <!-- 6. Analysis Generator -->
+    <script
+        src="https://cdn.jsdelivr.net/gh/Pick999999/PKIndicator@main/my-trading-lib/clsAnalysisGeneratorV2.js"></script>
+
+    <!-- 7. Chart Manager (Local File) -->
+    <script src="chart-manager.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f1729;
+            color: #d1d4dc;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #4a9eff;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #1a2340;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        select,
+        button {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #4a9eff;
+            background: #0f1729;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #4a9eff;
+            color: black;
+        }
+
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            border-color: #333;
+        }
+
+        .chart-container {
+            width: 100%;
+            max-width: 1200px;
+            border: 1px solid #1a2340;
+            margin-bottom: 10px;
+        }
+
+        #status {
+            font-weight: bold;
+            color: #00ff88;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🚀 SMC & Analysis V2 Chart Demo (MACD Integrated)</h1>
+
+    <div class="controls">
+        <label>Select Asset:</label>
+        <select id="assetSelect">
+            <option value="R_100">Volatility 100 (1s)</option>
+            <option value="R_75">Volatility 75 (1s)</option>
+            <option value="R_50">Volatility 50 (1s)</option>
+            <option value="R_25">Volatility 25 (1s)</option>
+            <option value="R_10">Volatility 10 (1s)</option>
+        </select>
+        <button id="loadBtn" onclick="loadData()" disabled>Load Data & Render</button>
+        <span id="status">Initializing...</span>
+    </div>
+
+    <!-- Chart Containers expected by ChartManager -->
+    <div id="mainChart" class="chart-container"></div>
+    <div id="rsiChart" class="chart-container"></div>
+    <div id="choppyChart" class="chart-container"></div>
+    <div id="macdChart" class="chart-container"></div>
+
+    <script>
+        // Global Instances
+        let charts = null;
+        let api = null;
+        let loader = null;
+        let generator = null;
+        let gpu = null;
+
+        async function init() {
+            try {
+                console.log("Initializing...");
+
+                // 1. Initialize ChartManager
+                // Ensure chart-manager.js is loaded and ChartManager is defined
+                if (typeof ChartManager === 'undefined') {
+                    throw new Error("ChartManager script not loaded!");
+                }
+                charts = new ChartManager();
+
+                // 2. Initialize Deriv API
+                api = new DerivAPI('1089');
+                document.getElementById('status').innerText = "Connecting to Deriv...";
+                await api.connect();
+                document.getElementById('status').innerText = "Connected";
+
+                // 3. Initialize GPU (Optional)
+                if (typeof WebGPUIndicators !== 'undefined') {
+                    gpu = new WebGPUIndicators();
+                    await gpu.initialize();
+                }
+
+                // 4. Initialize Asset Loader
+                loader = new MultiAssetLoader(api, gpu);
+
+                // Enable Button
+                document.getElementById('loadBtn').disabled = false;
+                document.getElementById('status').innerText = "Ready";
+                console.log("System Ready");
+
+            } catch (e) {
+                console.error("Initialization Failed:", e);
+                document.getElementById('status').innerText = "Init Failed: " + e.message;
+                document.getElementById('status').style.color = 'red';
+            }
+        }
+
+        async function loadData() {
+            if (!loader) {
+                alert("System not ready yet!");
+                return;
+            }
+
+            const symbol = document.getElementById('assetSelect').value;
+            document.getElementById('status').innerText = `Loading ${symbol}...`;
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+
+            try {
+                // 1. Load Data using MultiAssetLoader
+                // loadAndCalculate(symbols, granularity, count, maType, useSuperKernel)
+                const result = await loader.loadAndCalculate(
+                    [symbol],  // symbols array
+                    60,        // granularity (1 minute candles)
+                    1000,      // count
+                    'ema',     // maType
+                    false      // useSuperKernel
+                );
+
+                if (!result.success) throw new Error("Failed to load data");
+
+                const assetData = result.assets[symbol];
+                const indicatorData = result.indicators[symbol];
+
+                // Debug: log the data structure
+                console.log("Asset Data (first candle):", assetData.candles[0]);
+                console.log("Indicator Data keys:", Object.keys(indicatorData));
+
+                document.getElementById('status').innerText = "Rendering...";
+
+                // 2. Render Charts directly from loadAndCalculate result
+                renderCharts(assetData, indicatorData);
+
+                document.getElementById('status').innerText = `✅ Displaying ${symbol} (${assetData.candles.length} candles)`;
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = "Error: " + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function renderCharts(assetData, indicatorData) {
+            const candles = assetData.candles;
+
+            // 1. Candles (time is epoch from DerivAPI.formatCandles)
+            const candleSeriesData = candles.map(c => ({
+                time: c.time,       // epoch seconds
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close
+            }));
+            charts.updateCandles(candleSeriesData);
+
+            // 2. RSI
+            if (indicatorData.rsi && indicatorData.rsi.length > 0) {
+                const rsiData = [];
+                for (let i = 0; i < candles.length; i++) {
+                    if (indicatorData.rsi[i] !== undefined && indicatorData.rsi[i] !== null) {
+                        rsiData.push({ time: candles[i].time, value: indicatorData.rsi[i] });
+                    }
+                }
+                charts.updateRSI(rsiData);
+            }
+
+            // 3. Choppiness
+            if (indicatorData.choppy && indicatorData.choppy.length > 0) {
+                const choppyData = [];
+                for (let i = 0; i < candles.length; i++) {
+                    if (indicatorData.choppy[i] !== undefined && indicatorData.choppy[i] !== null) {
+                        choppyData.push({ time: candles[i].time, value: indicatorData.choppy[i] });
+                    }
+                }
+                charts.updateChoppiness(choppyData);
+            }
+
+            // 4. MA Lines
+            if (indicatorData.mas && indicatorData.mas.length > 0) {
+                indicatorData.mas.forEach((maArr, idx) => {
+                    if (idx < 3 && maArr) { // ChartManager supports up to 3 MA lines
+                        const maData = [];
+                        for (let i = 0; i < candles.length; i++) {
+                            if (maArr[i] !== undefined && maArr[i] !== null) {
+                                maData.push({ time: candles[i].time, value: maArr[i] });
+                            }
+                        }
+                        charts.updateMA(idx, maData);
+                    }
+                });
+            }
+
+            // 5. MACD (calculated from closes)
+            const closes = assetData.closes;
+            const macdRes = calculateMACD(closes);
+
+            const macdSeries = [];
+            const signalSeries = [];
+            const histSeries = [];
+
+            for (let i = 0; i < candles.length; i++) {
+                const t = candles[i].time;
+                if (macdRes.macd[i] !== null) macdSeries.push({ time: t, value: macdRes.macd[i] });
+                if (macdRes.signal[i] !== null) signalSeries.push({ time: t, value: macdRes.signal[i] });
+                if (macdRes.histogram[i] !== null) {
+                    histSeries.push({
+                        time: t,
+                        value: macdRes.histogram[i],
+                        color: macdRes.histogram[i] >= 0 ? '#26a69a' : '#ef5350'
+                    });
+                }
+            }
+
+            charts.updateMACD(macdSeries, signalSeries, histSeries);
+        }
+
+        // Helper: Simple MACD Calculation
+        function calculateMACD(prices, fast = 12, slow = 26, signal = 9) {
+            const emaFast = calculateEMA(prices, fast);
+            const emaSlow = calculateEMA(prices, slow);
+            const macdLine = prices.map((_, i) => (emaFast[i] !== null && emaSlow[i] !== null) ? emaFast[i] - emaSlow[i] : null);
+            const signalLine = calculateEMA(macdLine, signal);
+            const histogram = macdLine.map((m, i) => (m !== null && signalLine[i] !== null) ? m - signalLine[i] : null);
+
+            return { macd: macdLine, signal: signalLine, histogram: histogram };
+        }
+
+        function calculateEMA(data, period) {
+            const k = 2 / (period + 1);
+            let emaArray = new Array(data.length).fill(null);
+            let sum = 0;
+            // SMA for first value
+            for (let i = 0; i < period; i++) {
+                if (data[i] !== null) sum += data[i];
+            }
+            if (data[period - 1] !== null) emaArray[period - 1] = sum / period;
+
+            for (let i = period; i < data.length; i++) {
+                if (data[i] !== null && emaArray[i - 1] !== null) {
+                    emaArray[i] = (data[i] - emaArray[i - 1]) * k + emaArray[i - 1];
+                }
+            }
+            return emaArray;
+        }
+
+        // Initialize App
+        window.addEventListener('load', init);
+
+    </script>
+</body>
+
+</html>

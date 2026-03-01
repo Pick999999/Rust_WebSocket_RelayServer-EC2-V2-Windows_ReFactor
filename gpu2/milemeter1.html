@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gauge Indicators</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .gauge-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .gauge-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .gauge-title {
+            text-align: center;
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* Gauge Type 1: Classic Speedometer */
+        .gauge-classic {
+            position: relative;
+            width: 250px;
+            height: 150px;
+            margin: 0 auto;
+        }
+
+        .gauge-classic svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-value {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .gauge-label {
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Gauge Type 2: Modern Circle */
+        .gauge-circle {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        .gauge-circle svg {
+            transform: rotate(-90deg);
+        }
+
+        .circle-bg {
+            fill: none;
+            stroke: #f0f0f0;
+            stroke-width: 20;
+        }
+
+        .circle-progress {
+            fill: none;
+            stroke-width: 20;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .gauge-circle .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        .gauge-circle .gauge-label {
+            position: absolute;
+            top: 65%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1em;
+            color: #666;
+        }
+
+        /* Gauge Type 3: Half Circle Modern */
+        .gauge-half {
+            position: relative;
+            width: 250px;
+            height: 150px;
+            margin: 0 auto;
+        }
+
+        .gauge-half svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Gauge Type 4: Bar Gauge */
+        .gauge-bar {
+            width: 100%;
+            height: 40px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .gauge-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            border-radius: 20px;
+            transition: width 1s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .gauge-bar-value {
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-top: 10px;
+        }
+
+        /* Gauge Type 5: Needle Gauge */
+        .gauge-needle {
+            position: relative;
+            width: 250px;
+            height: 150px;
+            margin: 0 auto;
+        }
+
+        .gauge-needle svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .needle {
+            transform-origin: 125px 125px;
+            transition: transform 1s ease;
+        }
+
+        /* Gauge Type 6: Segmented Circle */
+        .gauge-segments {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        .segment {
+            position: absolute;
+            width: 20px;
+            height: 80px;
+            border-radius: 10px;
+            background: #f0f0f0;
+            transform-origin: 10px 100px;
+            transition: background 0.3s ease;
+        }
+
+        .segment.active {
+            background: linear-gradient(180deg, #667eea, #764ba2);
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .slider {
+            width: 80%;
+            margin: 10px auto;
+            display: block;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-group {
+            margin-top: 15px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin: 0 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Dashboard - Gauge Indicators</h1>
+        
+        <div class="dashboard-grid">
+            <!-- Gauge 1: Classic Speedometer -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 1: Classic Speedometer</div>
+                <div class="gauge-classic" id="gauge1">
+                    <svg viewBox="0 0 250 150">
+                        <defs>
+                            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
+                                <stop offset="50%" style="stop-color:#fbbf24;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M 25 125 A 100 100 0 0 1 225 125" 
+                              fill="none" 
+                              stroke="url(#grad1)" 
+                              stroke-width="30" 
+                              stroke-linecap="round"/>
+                        <circle cx="125" cy="125" r="8" fill="#333"/>
+                        <line id="needle1" x1="125" y1="125" x2="125" y2="45" 
+                              stroke="#333" stroke-width="3" stroke-linecap="round"
+                              style="transform-origin: 125px 125px; transform: rotate(-90deg);"/>
+                    </svg>
+                    <div class="gauge-value" id="value1">0%</div>
+                </div>
+                <div class="gauge-label">Performance</div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider1">
+                </div>
+            </div>
+
+            <!-- Gauge 2: Modern Circle -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 2: Modern Circle Progress</div>
+                <div class="gauge-circle" id="gauge2">
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="80" class="circle-bg"/>
+                        <circle id="circle2" cx="100" cy="100" r="80" 
+                                class="circle-progress"
+                                stroke="#667eea"
+                                stroke-dasharray="502.65"
+                                stroke-dashoffset="502.65"/>
+                    </svg>
+                    <div class="gauge-value" id="value2">0%</div>
+                    <div class="gauge-label">CPU Usage</div>
+                </div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider2">
+                </div>
+            </div>
+
+            <!-- Gauge 3: Half Circle Modern -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 3: Semi-Circle Gauge</div>
+                <div class="gauge-half" id="gauge3">
+                    <svg viewBox="0 0 250 150">
+                        <defs>
+                            <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M 30 130 A 95 95 0 0 1 220 130" 
+                              fill="none" 
+                              stroke="#f0f0f0" 
+                              stroke-width="25"/>
+                        <path id="arc3" d="M 30 130 A 95 95 0 0 1 220 130" 
+                              fill="none" 
+                              stroke="url(#grad3)" 
+                              stroke-width="25"
+                              stroke-linecap="round"
+                              stroke-dasharray="299"
+                              stroke-dashoffset="299"/>
+                        <text x="125" y="110" text-anchor="middle" font-size="35" font-weight="bold" fill="#333" id="text3">0%</text>
+                        <text x="125" y="135" text-anchor="middle" font-size="14" fill="#666">Memory</text>
+                    </svg>
+                </div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider3">
+                </div>
+            </div>
+
+            <!-- Gauge 4: Bar Gauge -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 4: Progress Bar Gauge</div>
+                <div class="gauge-bar">
+                    <div class="gauge-bar-fill" id="bar4" style="width: 0%"></div>
+                </div>
+                <div class="gauge-bar-value" id="value4">0%</div>
+                <div class="gauge-label">Storage Space</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value">256 GB</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="used4">0 GB</div>
+                        <div class="stat-label">Used</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="free4">256 GB</div>
+                        <div class="stat-label">Free</div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider4">
+                </div>
+            </div>
+
+            <!-- Gauge 5: Needle Speedometer -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 5: Needle Speedometer</div>
+                <div class="gauge-needle" id="gauge5">
+                    <svg viewBox="0 0 250 150">
+                        <!-- Background arcs with colors -->
+                        <path d="M 25 125 A 100 100 0 0 1 83.3 41.7" 
+                              fill="none" stroke="#22c55e" stroke-width="20"/>
+                        <path d="M 83.3 41.7 A 100 100 0 0 1 166.7 41.7" 
+                              fill="none" stroke="#fbbf24" stroke-width="20"/>
+                        <path d="M 166.7 41.7 A 100 100 0 0 1 225 125" 
+                              fill="none" stroke="#ef4444" stroke-width="20"/>
+                        
+                        <!-- Scale marks -->
+                        <text x="35" y="135" font-size="12" fill="#666">0</text>
+                        <text x="70" y="60" font-size="12" fill="#666">50</text>
+                        <text x="210" y="135" font-size="12" fill="#666">100</text>
+                        
+                        <!-- Center circle -->
+                        <circle cx="125" cy="125" r="10" fill="#333"/>
+                        
+                        <!-- Needle -->
+                        <line class="needle" id="needle5" x1="125" y1="125" x2="125" y2="40" 
+                              stroke="#333" stroke-width="4" stroke-linecap="round"
+                              style="transform: rotate(-90deg);"/>
+                        <circle cx="125" cy="125" r="6" fill="#667eea"/>
+                    </svg>
+                    <div class="gauge-value" id="value5">0%</div>
+                </div>
+                <div class="gauge-label">Network Speed</div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider5">
+                </div>
+            </div>
+
+            <!-- Gauge 6: Segmented Circle -->
+            <div class="gauge-card">
+                <div class="gauge-title">แบบที่ 6: Segmented Circle</div>
+                <div class="gauge-segments" id="gauge6">
+                    <!-- Segments will be created by JavaScript -->
+                </div>
+                <div class="gauge-value" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" id="value6">0%</div>
+                <div class="gauge-label">Battery Level</div>
+                <div class="controls">
+                    <input type="range" class="slider" min="0" max="100" value="0" id="slider6">
+                </div>
+            </div>
+        </div>
+
+        <div class="gauge-card">
+            <div class="gauge-title">🎮 Control Panel</div>
+            <div class="btn-group">
+                <button onclick="setAllGauges(0)">Reset</button>
+                <button onclick="setAllGauges(25)">25%</button>
+                <button onclick="setAllGauges(50)">50%</button>
+                <button onclick="setAllGauges(75)">75%</button>
+                <button onclick="setAllGauges(100)">100%</button>
+                <button onclick="animateRandom()">🎲 Random</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Gauge 6 segments
+        function initSegments() {
+            const container = document.getElementById('gauge6');
+            const numSegments = 20;
+            const angleStep = 360 / numSegments;
+            
+            for (let i = 0; i < numSegments; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'segment';
+                segment.style.transform = `rotate(${i * angleStep}deg) translateY(-100px)`;
+                segment.dataset.index = i;
+                container.appendChild(segment);
+            }
+        }
+        initSegments();
+
+        // Update functions for each gauge
+        function updateGauge1(value) {
+            const angle = (value / 100) * 180 - 90;
+            document.getElementById('needle1').style.transform = `rotate(${angle}deg)`;
+            document.getElementById('value1').textContent = value + '%';
+            document.getElementById('slider1').value = value;
+        }
+
+        function updateGauge2(value) {
+            const circumference = 502.65;
+            const offset = circumference - (value / 100) * circumference;
+            document.getElementById('circle2').style.strokeDashoffset = offset;
+            document.getElementById('value2').textContent = value + '%';
+            document.getElementById('slider2').value = value;
+            
+            // Color change based on value
+            const circle = document.getElementById('circle2');
+            if (value < 50) {
+                circle.style.stroke = '#22c55e';
+            } else if (value < 80) {
+                circle.style.stroke = '#fbbf24';
+            } else {
+                circle.style.stroke = '#ef4444';
+            }
+        }
+
+        function updateGauge3(value) {
+            const length = 299;
+            const offset = length - (value / 100) * length;
+            document.getElementById('arc3').style.strokeDashoffset = offset;
+            document.getElementById('text3').textContent = value + '%';
+            document.getElementById('slider3').value = value;
+        }
+
+        function updateGauge4(value) {
+            document.getElementById('bar4').style.width = value + '%';
+            document.getElementById('value4').textContent = value + '%';
+            document.getElementById('slider4').value = value;
+            
+            const used = Math.round((value / 100) * 256);
+            const free = 256 - used;
+            document.getElementById('used4').textContent = used + ' GB';
+            document.getElementById('free4').textContent = free + ' GB';
+            
+            // Color change
+            const bar = document.getElementById('bar4');
+            if (value < 70) {
+                bar.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)';
+            } else if (value < 90) {
+                bar.style.background = 'linear-gradient(90deg, #fbbf24, #f59e0b)';
+            } else {
+                bar.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+            }
+        }
+
+        function updateGauge5(value) {
+            const angle = (value / 100) * 180 - 90;
+            document.getElementById('needle5').style.transform = `rotate(${angle}deg)`;
+            document.getElementById('value5').textContent = value + '%';
+            document.getElementById('slider5').value = value;
+        }
+
+        function updateGauge6(value) {
+            const segments = document.querySelectorAll('#gauge6 .segment');
+            const activeCount = Math.round((value / 100) * segments.length);
+            
+            segments.forEach((segment, index) => {
+                if (index < activeCount) {
+                    segment.classList.add('active');
+                } else {
+                    segment.classList.remove('active');
+                }
+            });
+            
+            document.getElementById('value6').textContent = value + '%';
+            document.getElementById('slider6').value = value;
+        }
+
+        // Event listeners for sliders
+        document.getElementById('slider1').addEventListener('input', (e) => updateGauge1(parseInt(e.target.value)));
+        document.getElementById('slider2').addEventListener('input', (e) => updateGauge2(parseInt(e.target.value)));
+        document.getElementById('slider3').addEventListener('input', (e) => updateGauge3(parseInt(e.target.value)));
+        document.getElementById('slider4').addEventListener('input', (e) => updateGauge4(parseInt(e.target.value)));
+        document.getElementById('slider5').addEventListener('input', (e) => updateGauge5(parseInt(e.target.value)));
+        document.getElementById('slider6').addEventListener('input', (e) => updateGauge6(parseInt(e.target.value)));
+
+        // Control functions
+        function setAllGauges(value) {
+            updateGauge1(value);
+            updateGauge2(value);
+            updateGauge3(value);
+            updateGauge4(value);
+            updateGauge5(value);
+            updateGauge6(value);
+        }
+
+        function animateRandom() {
+            const values = [
+                Math.floor(Math.random() * 101),
+                Math.floor(Math.random() * 101),
+                Math.floor(Math.random() * 101),
+                Math.floor(Math.random() * 101),
+                Math.floor(Math.random() * 101),
+                Math.floor(Math.random() * 101)
+            ];
+            
+            updateGauge1(values[0]);
+            updateGauge2(values[1]);
+            updateGauge3(values[2]);
+            updateGauge4(values[3]);
+            updateGauge5(values[4]);
+            updateGauge6(values[5]);
+        }
+
+        // Initialize with demo animation
+        setTimeout(() => {
+            animateRandom();
+        }, 500);
+    </script>
+</body>
+</html>

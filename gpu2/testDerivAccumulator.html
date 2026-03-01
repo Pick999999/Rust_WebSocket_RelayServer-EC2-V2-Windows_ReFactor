@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deriv Accumulator Trade (Real Money)</title>
+    <!-- Project Dependencies -->
+    <script src="MultiAssetBundle.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #252526;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid #3c3c3c;
+        }
+
+        h1 {
+            color: #4ec9b0;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+
+        .section-title {
+            color: #569cd6;
+            font-size: 18px;
+            border-bottom: 1px solid #3c3c3c;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #d4d4d4;
+            font-weight: 500;
+        }
+
+        select,
+        input[type="number"],
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: #4ec9b0;
+            box-shadow: 0 0 5px rgba(78, 201, 176, 0.3);
+        }
+
+        .growth-options {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .growth-option {
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .growth-option.selected {
+            background-color: #4ec9b0;
+            color: #1e1e1e;
+            border-color: #4ec9b0;
+            font-weight: bold;
+        }
+
+        .growth-option:hover:not(.selected) {
+            background-color: #444;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, #0e639c, #1177bb);
+            color: white;
+        }
+
+        button.primary:hover {
+            background: linear-gradient(135deg, #1177bb, #2299dd);
+            box-shadow: 0 4px 12px rgba(17, 119, 187, 0.4);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #b91c1c, #ef4444);
+            color: white;
+        }
+
+        button.danger:hover {
+            background: linear-gradient(135deg, #ef4444, #f87171);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .status-success {
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            color: #4caf50;
+        }
+
+        .status-error {
+            background-color: rgba(244, 67, 54, 0.1);
+            border: 1px solid #f44336;
+            color: #f44336;
+        }
+
+        .status-info {
+            background-color: rgba(33, 150, 243, 0.1);
+            border: 1px solid #2196f3;
+            color: #2196f3;
+        }
+
+        /* Active Trade Panel */
+        .trade-monitor {
+            margin-top: 25px;
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #4ec9b0;
+            display: none;
+        }
+
+        .trade-stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+
+        .trade-stat:last-child {
+            border-bottom: none;
+        }
+
+        .profit-value {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+            transition: color 0.3s;
+        }
+
+        .profit-pos {
+            color: #4caf50;
+        }
+
+        .profit-neg {
+            color: #f44336;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Deriv Accumulator Trade</h1>
+
+        <!-- Authentication Phase -->
+        <div id="authSection">
+            <div class="form-group">
+                <label for="apiToken">Deriv API Token</label>
+                <input type="password" id="apiToken" placeholder="Enter your API Token">
+                <div class="info-text">You can get this from Deriv Settings > API Token. Scope: 'read', 'trade'.</div>
+            </div>
+            <button class="primary" onclick="connectAndAuthorize()">🔐 Connect & Authorize</button>
+        </div>
+
+        <!-- Trading Phase -->
+        <div id="tradeSection" style="display:none; opacity: 0.5; pointer-events: none;">
+            <div class="section-title">Trade Settings</div>
+
+            <div class="form-group">
+                <label for="assetSelect">Underlying Asset</label>
+                <select id="assetSelect">
+                    <option value="" disabled selected>Loading assets...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Growth Rate</label>
+                <div class="growth-options" id="growthOptions">
+                    <div class="growth-option" data-value="0.01">1%</div>
+                    <div class="growth-option" data-value="0.02">2%</div>
+                    <div class="growth-option" data-value="0.03">3%</div>
+                    <div class="growth-option" data-value="0.04">4%</div>
+                    <div class="growth-option" data-value="0.05">5%</div>
+                </div>
+                <input type="hidden" id="growthRate" value="">
+            </div>
+
+            <div class="form-group">
+                <label for="stakeAmount">Stake Amount (USD)</label>
+                <input type="number" id="stakeAmount" value="10" min="1" step="0.1">
+            </div>
+
+            <div class="form-group">
+                <label for="takeProfit">Take Profit (Optional)</label>
+                <input type="number" id="takeProfit" placeholder="e.g. 50.00" min="0" step="0.1">
+            </div>
+
+            <button class="primary" id="btnBuy" onclick="placeTrade()">🚀 Buy Accumulator</button>
+        </div>
+
+        <!-- Monitoring Phase -->
+        <div id="monitorSection" class="trade-monitor">
+            <h3 style="margin-top:0; color:#4ec9b0">Active Trade</h3>
+            <div class="trade-stat">
+                <span>Asset:</span>
+                <span id="monAsset">--</span>
+            </div>
+            <div class="trade-stat">
+                <span>Buy Price:</span>
+                <span id="monBuyPrice">--</span>
+            </div>
+            <div class="trade-stat">
+                <span>Current Spot:</span>
+                <span id="monSpot">--</span>
+            </div>
+
+            <div class="profit-value profit-pos" id="monProfit">0.00 USD</div>
+
+            <button class="danger" id="btnSell" onclick="sellTrade()">🛑 Close Trade (Sell)</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // Global State
+        let api = null;
+        let currentContractId = null;
+        let isAuthorized = false;
+
+        // 1. Initialize & Fetch Assets on Load (Unauthenticated lists)
+        async function init() {
+            // We use a temporary anonymous connection just to fetch assets if user hasn't logged in yet
+            // But we can just wait for auth.
+            // Let's just prep the UI.
+            const defaultRate = document.querySelector('.growth-option[data-value="0.03"]');
+            if (defaultRate) defaultRate.click();
+
+            // Populate Assets Dropdown (Hardcoded fallback + Dynamic)
+            populateAssetSelect();
+        }
+
+        async function populateAssetSelect(derivApiInstance = null) {
+            const assetSelect = document.getElementById('assetSelect');
+            assetSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+
+            try {
+                let activeSymbols = [];
+                if (derivApiInstance) {
+                    activeSymbols = await derivApiInstance.getActiveSymbols();
+                } else {
+                    // Quick fetch using a temp instance if not auth yet
+                    const tempApi = new DerivAPI("1089");
+                    await tempApi.connect();
+                    activeSymbols = await tempApi.getActiveSymbols();
+                    tempApi.disconnect();
+                }
+
+                const volatilityIndices = activeSymbols.filter(s =>
+                    (s.market === 'synthetic_index' && s.submarket === 'random_index') ||
+                    s.submarket === 'random_index'
+                ).sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+                assetSelect.innerHTML = '';
+                volatilityIndices.forEach(asset => {
+                    const option = document.createElement('option');
+                    option.value = asset.symbol;
+                    option.textContent = `${asset.symbol} - ${asset.display_name}`;
+                    assetSelect.appendChild(option);
+                });
+
+                // Default
+                if (volatilityIndices.some(a => a.symbol === "R_100")) assetSelect.value = "R_100";
+                else if (volatilityIndices.length > 0) assetSelect.value = volatilityIndices[0].symbol;
+
+            } catch (e) {
+                console.warn("Asset fetch failed", e);
+                // Fallback
+                assetSelect.innerHTML = '';
+                ["R_10", "R_25", "R_50", "R_75", "R_100", "1HZ10V", "1HZ100V"].forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s;
+                    option.textContent = s;
+                    assetSelect.appendChild(option);
+                });
+                assetSelect.value = "R_100";
+            }
+        }
+
+        // 2. Auth Logic
+        async function connectAndAuthorize() {
+            const token = document.getElementById('apiToken').value.trim();
+            if (!token) return showStatus("Please enter an API Token", "error");
+
+            showStatus("Connecting...", "info");
+
+            try {
+                if (api) api.disconnect();
+                api = new DerivAPI("1089");
+
+                // --- MONKEY PATCH HandleMessage to support generic events ---
+                const originalHandle = api.handleMessage.bind(api);
+                api.handleMessage = function (data) {
+                    originalHandle(data);
+                    // Custom dispatch for generic stream events
+                    if (data.msg_type && this.messageHandlers.has(data.msg_type)) {
+                        this.messageHandlers.get(data.msg_type)(data);
+                    }
+                };
+                // -----------------------------------------------------------
+
+                await api.connect();
+
+                const authResp = await api.sendAndWait({ authorize: token });
+
+                if (authResp.error) throw new Error(authResp.error.message);
+
+                isAuthorized = true;
+                const balanceResp = await api.sendAndWait({ balance: 1, subscribe: 1 });
+                const balance = balanceResp.balance ? balanceResp.balance.balance : '?';
+                const currency = balanceResp.balance ? balanceResp.balance.currency : 'USD';
+
+                showStatus(`✅ Authorized! Balance: <strong>${balance} ${currency}</strong>`, "success");
+
+                // Enable Trade UI
+                const tradeSection = document.getElementById('tradeSection');
+                tradeSection.style.display = 'block';
+                tradeSection.style.opacity = '1';
+                tradeSection.style.pointerEvents = 'auto';
+
+                // Hide Auth UI
+                document.getElementById('authSection').style.display = 'none';
+
+                // Refresh assets with auth context
+                populateAssetSelect(api);
+
+            } catch (error) {
+                console.error(error);
+                showStatus(`❌ Auth Failed: ${error.message}`, "error");
+            }
+        }
+
+        // 3. Trade Logic
+        async function placeTrade() {
+            if (!isAuthorized) return showStatus("Not authorized", "error");
+
+            const symbol = document.getElementById('assetSelect').value;
+            const growthRate = parseFloat(document.getElementById('growthRate').value);
+            const stake = parseFloat(document.getElementById('stakeAmount').value);
+            const takeProfit = parseFloat(document.getElementById('takeProfit').value);
+
+            showStatus("Requesting Proposal...", "info");
+            document.getElementById('btnBuy').disabled = true;
+
+            try {
+                // 1. Get Proposal
+                const proposalReq = {
+                    proposal: 1,
+                    subscribe: 1, // We must subscribe to get updates/buy? Actually for ACCU usually just one proposal is needed to buy? 
+                    // Usually for buy, we need a proposal id.
+                    amount: stake,
+                    basis: "stake",
+                    contract_type: "ACCU",
+                    currency: "USD",
+                    symbol: symbol,
+                    growth_rate: growthRate
+                };
+
+                // Accumulators do not support 'take_profit' in proposal.
+                // We handle it client-side.
+
+                console.log("Proposal Req:", proposalReq);
+                const propResp = await api.sendAndWait(proposalReq);
+
+                if (propResp.error) throw new Error("Proposal Error: " + propResp.error.message);
+
+                const proposalId = propResp.proposal.id;
+                const askPrice = propResp.proposal.ask_price;
+
+                console.log(`Proposal ID: ${proposalId}, Price: ${askPrice}`);
+                showStatus(`Proposal received. Buying...`, "info");
+
+                // 2. Execute Buy
+                const buyReq = {
+                    buy: proposalId,
+                    price: askPrice
+                };
+
+                const buyResp = await api.sendAndWait(buyReq);
+                if (buyResp.error) throw new Error("Buy Error: " + buyResp.error.message);
+
+                currentContractId = buyResp.buy.contract_id;
+                console.log("Contract Bought:", currentContractId);
+
+                // 3. Start Monitoring (Pass TP for client-side)
+                startMonitoring(currentContractId, takeProfit);
+
+                // Forget proposal subscription (optional, but good practice)
+                api.send({ forget: proposalId }); // Assuming API supports forget by ID
+
+            } catch (error) {
+                console.error(error);
+                showStatus(`❌ Trade Failed: ${error.message}`, "error");
+                document.getElementById('btnBuy').disabled = false;
+            }
+        }
+
+        // 4. Monitoring Logic
+        function startMonitoring(contractId, takeProfitValue) {
+            // UI Switch
+            document.getElementById('monitorSection').style.display = 'block';
+            document.getElementById('btnBuy').style.display = 'none'; // Hide buy button during active trade? Or disable it.
+
+            showStatus(`🟢 Trade Active. Monitoring... ${takeProfitValue ? `(TP: $${takeProfitValue})` : ''}`, "status-info");
+
+            // Subscribe to contract updates
+            api.send({
+                proposal_open_contract: 1,
+                contract_id: contractId,
+                subscribe: 1
+            });
+
+            api.on('proposal_open_contract', (data) => {
+                const contract = data.proposal_open_contract;
+                if (!contract) return;
+
+                // Only update if it allows (match ID)
+                if (contract.contract_id !== currentContractId) return;
+
+                // Update UI
+                const profit = parseFloat(contract.profit);
+                const profitEl = document.getElementById('monProfit');
+                profitEl.textContent = `${profit > 0 ? '+' : ''}${profit.toFixed(2)} USD`;
+                profitEl.className = `profit-value ${profit >= 0 ? 'profit-pos' : 'profit-neg'}`;
+
+                document.getElementById('monAsset').textContent = contract.underlying_symbol;
+                document.getElementById('monBuyPrice').textContent = contract.buy_price;
+                document.getElementById('monSpot').textContent = contract.current_spot;
+
+                // Client-side Take Profit Check
+                if (!contract.is_sold && takeProfitValue && profit >= takeProfitValue) {
+                    console.log(`Take Profit Triggered: ${profit} >= ${takeProfitValue}`);
+                    sellTrade();
+                }
+
+                // Check status
+                if (contract.is_sold) {
+                    const result = profit >= 0 ? "WIN" : "LOSS";
+                    showStatus(`🏁 Trade Ended: ${result}. Profit: ${profit.toFixed(2)} USD`, profit >= 0 ? "success" : "error");
+                    document.getElementById('btnSell').disabled = true;
+                    document.getElementById('btnSell').textContent = "Trade Closed";
+
+                    // Stop subscription
+                    if (data.subscription) {
+                        api.send({ forget: data.subscription.id });
+                    }
+
+                    // Reset UI after delay?
+                    setTimeout(() => {
+                        document.getElementById('btnBuy').disabled = false;
+                        document.getElementById('btnBuy').style.display = 'block';
+                        // Keep monitor visible specifically for the result, or maybe clear it?
+                        // Let's leave it visible until new trade.
+                    }, 2000);
+                }
+            });
+        }
+
+        // 5. Sell Logic
+        async function sellTrade() {
+            if (!currentContractId) return;
+
+            showStatus("Attempting to sell...", "info");
+            try {
+                const sellResp = await api.sendAndWait({
+                    sell: currentContractId,
+                    price: 0 // Sell at market
+                });
+
+                if (sellResp.error) throw new Error(sellResp.error.message);
+
+                console.log("Sell response:", sellResp);
+                showStatus("✅ Sold successfully.", "success");
+
+            } catch (error) {
+                console.error(error);
+                showStatus(`❌ Sell Failed: ${error.message}`, "error");
+            }
+        }
+
+        // Helper: Growth Rate Selection
+        const growthOptions = document.querySelectorAll('.growth-option');
+        const growthInput = document.getElementById('growthRate');
+        growthOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                growthOptions.forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                growthInput.value = opt.getAttribute('data-value');
+            });
+        });
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.innerHTML = msg;
+            el.className = type === 'error' ? 'status-error' : (type === 'success' ? 'status-success' : 'status-info');
+            el.style.display = 'block';
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>
