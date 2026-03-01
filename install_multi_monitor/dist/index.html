@@ -756,6 +756,7 @@
                     choppy: null,
                     lastPrice: null,
                     tickCount: 0,
+                    recentTickDirs: [],
                     lastSignal: { action: "WAIT", strategy: "—" },
                     markers: [],       // {time, position, color, shape, text}
                     generator_worker: workerClient, // เปลี่ยนมาใช้ worker แทน generator ตรงๆ
@@ -881,6 +882,17 @@
                         <span class="signal-badge wait" id="badge-${a.symbol}" style="margin:0;">WAIT</span>
                         <div class="signal-strat" id="strat-${a.symbol}" style="margin:0;">—</div>
                     </div>
+                    
+                    <!-- Tick Trend Tracker -->
+                    <div style="margin-top:8px; font-size:11px; background:rgba(0,0,0,0.2); padding:6px 8px; border-radius:6px; flex-direction:column; gap:6px; display:flex; border: 1px solid rgba(255,255,255,0.05)">
+                        <div style="display:flex; justify-content:space-between; align-items:center; width: 100%;">
+                            <span style="color:var(--t2);">10 Ticks Trend 🚀</span>
+                            <span id="tick-pct-${a.symbol}" style="font-weight:bold; font-size:12px; font-family:monospace;">-</span>
+                        </div>
+                        <div id="tick-dots-${a.symbol}" style="display:flex; gap:3px; font-size:10px; height: 14px; overflow: hidden; align-items:center;">
+                            <span style="color:var(--t3);">รอการเปลี่ยนแปลงราคา...</span>
+                        </div>
+                    </div>
                 </div>
                 
                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -915,6 +927,8 @@
                     <div class="glass-row"><span class="glass-label">BB State</span><span class="glass-val" id="g-bb-${a.symbol}">-</span></div>
                     <div class="glass-row"><span class="glass-label">ATR State</span><span class="glass-val" id="g-atr-${a.symbol}">-</span></div>
                     <div class="glass-row"><span class="glass-label">Choppy</span><span class="glass-val" id="g-ci-${a.symbol}">-</span></div>
+                    <div class="glass-row"><span class="glass-label">Status Code</span><span class="glass-val" id="g-sc-${a.symbol}" style="font-family:monospace; color:var(--yellow); font-size:12px;">-</span></div>
+                    <div class="glass-row"><span class="glass-label">Status Desc</span><span class="glass-val" id="g-sd-${a.symbol}" style="font-size:11px; color:var(--blue);">-</span></div>
                     <div class="glass-row" style="margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05); flex-direction:column; align-items:flex-start;">
                         <span class="glass-label" style="margin-bottom:2px; font-weight:bold; color:var(--purple)">วิเคราะห์ความสอดคล้องสรุป</span>
                         <span class="glass-val" id="g-summary-${a.symbol}" style="font-size:13px; font-weight:bold; line-height:1.4;">กำลังสแกน...</span>
@@ -926,6 +940,7 @@
             <div class="card-charts">
                 <div class="mini-main-chart" id="chartMain-${a.symbol}"></div>
                 <div class="mini-choppy-chart" id="chartCi-${a.symbol}"></div>
+                <div id="ci-desc-${a.symbol}" style="font-size:12px; padding: 6px 10px; text-align: center; background: rgba(0,0,0,0.15); border-radius: 0 0 12px 12px; border-top: 1px solid rgba(255,255,255,0.05); color: var(--t2); line-height: 1.4;">กำลังฟังสัญญาณ Choppy...</div>
             </div>
         `;
                 grid.appendChild(card);
@@ -935,6 +950,37 @@
         // ==========================================
         //  UI Updates
         // ==========================================
+        function updateTickTrendUI(symbol) {
+            const s = assetState[symbol];
+            if (!s || s.recentTickDirs.length === 0) return;
+
+            const dotsContainer = document.getElementById('tick-dots-' + symbol);
+            const pctContainer = document.getElementById('tick-pct-' + symbol);
+
+            if (!dotsContainer || !pctContainer) return;
+
+            let upCount = 0;
+            let downCount = 0;
+            let dotsHtml = '';
+
+            s.recentTickDirs.forEach(dir => {
+                if (dir === 'Up') {
+                    upCount++;
+                    dotsHtml += '🟢';
+                } else {
+                    downCount++;
+                    dotsHtml += '🔴';
+                }
+            });
+
+            const total = s.recentTickDirs.length;
+            const upPct = Math.round((upCount / total) * 100);
+            const downPct = Math.round((downCount / total) * 100);
+
+            dotsContainer.innerHTML = dotsHtml;
+            pctContainer.innerHTML = `<span style="color:var(--green)">${upPct}%</span> <span style="color:var(--t3); margin: 0 2px;">/</span> <span style="color:var(--red)">${downPct}%</span>`;
+        }
+
         function updateGauge(symbol, choppy) {
             if (choppy == null) return;
             const val = Math.max(0, Math.min(100, choppy));
@@ -1100,6 +1146,16 @@
         function processTick(symbol, price, epoch) {
             const s = assetState[symbol];
             if (!s) return;
+
+            if (s.lastPrice !== null && price !== s.lastPrice) {
+                const dir = price > s.lastPrice ? 'Up' : 'Down';
+                s.recentTickDirs.push(dir);
+                if (s.recentTickDirs.length > 10) {
+                    s.recentTickDirs.shift();
+                }
+                updateTickTrendUI(symbol);
+            }
+
             s.lastPrice = price;
             s.tickCount++;
 
@@ -1251,6 +1307,8 @@
                 const gBb = document.getElementById('g-bb-' + a.symbol);
                 const gAtr = document.getElementById('g-atr-' + a.symbol);
                 const gCi = document.getElementById('g-ci-' + a.symbol);
+                const gSc = document.getElementById('g-sc-' + a.symbol);
+                const gSd = document.getElementById('g-sd-' + a.symbol);
 
                 if (gEma) {
                     const e1 = analysis.ema_short_direction;
@@ -1276,12 +1334,38 @@
 
                 if (gCi) {
                     let ciSt = "";
+                    let ciDescHtml = "";
                     gCi.className = 'glass-val';
-                    if (choppy < 38.2) { ciSt = "เทรนแรงมาก 🔥"; }
-                    else if (choppy < 50) { ciSt = "เริ่มมีเทรน 🚀"; }
-                    else if (choppy <= 61.8) { ciSt = "พักตัว ⏸"; }
-                    else { ciSt = "บีบอัด/ไร้ทิศ 🎯"; }
+                    if (choppy < 38.2) {
+                        ciSt = "เทรนแรงมาก 🔥";
+                        ciDescHtml = `<span style="color:var(--green)">Zone A (Strong Trend):</span> ตลาดมีทิศทางชัดเจนและรุนแรง เหมาะสำหรับกลยุทธ์ตามเทรนด์`;
+                    }
+                    else if (choppy < 50) {
+                        ciSt = "เริ่มมีเทรน 🚀";
+                        ciDescHtml = `<span style="color:var(--blue)">Zone B (Moderate Trend):</span> ตลาดเริ่มก่อตัวเป็นเทรนด์ สามารถหาจังหวะเข้าทำกำไรได้`;
+                    }
+                    else if (choppy <= 61.8) {
+                        ciSt = "พักตัว ⏸";
+                        ciDescHtml = `<span style="color:var(--yellow)">Zone C (Transition):</span> ตลาดกำลังพักตัวหรือสะสมพลังงาน แนะนำให้รอความชัดเจน`;
+                    }
+                    else {
+                        ciSt = "บีบอัด/ไร้ทิศ 🎯";
+                        ciDescHtml = `<span style="color:var(--red)">Zone D (Sideways):</span> ตลาดบีบอัดกวัดแกว่ง ไม่มีทิศทางชัดเจน ควรระมัดระวัง`;
+                    }
                     gCi.textContent = ciSt;
+
+                    const ciDescEl = document.getElementById('ci-desc-' + a.symbol);
+                    if (ciDescEl) {
+                        ciDescEl.innerHTML = ciDescHtml;
+                    }
+                }
+
+                if (gSc) {
+                    gSc.textContent = analysis.status_code || "-";
+                }
+
+                if (gSd) {
+                    gSd.textContent = analysis.status_desc || "-";
                 }
 
                 if (gAtr && analysis.atr) {
