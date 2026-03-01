@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Asset Choppy Monitor + Live Charts</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #080c18;
+            --card: #0f1629;
+            --border: #1a2744;
+            --t1: #f1f5f9;
+            --t2: #94a3b8;
+            --t3: #475569;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--t1);
+            min-height: 100vh
+        }
+
+        .top-bar {
+            background: linear-gradient(135deg, #0f1629, #1a1040);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .top-bar h1 {
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .top-controls {
+            display: flex;
+            align-items: center;
+            gap: 14px
+        }
+
+        .top-controls label {
+            font-size: 12px;
+            color: var(--t3)
+        }
+
+        .top-controls select,
+        .top-controls input {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--t1);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--red);
+            display: inline-block
+        }
+
+        .dot.on {
+            background: var(--green);
+            box-shadow: 0 0 8px rgba(16, 185, 129, .4)
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            transition: all .2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-go {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff
+        }
+
+        .btn-go:hover {
+            box-shadow: 0 4px 12px rgba(99, 102, 241, .4)
+        }
+
+        .btn-stop {
+            background: rgba(239, 68, 68, .15);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, .3)
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            padding: 20px 24px;
+        }
+
+        /* Asset Card */
+        .asset-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all .2s;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .asset-card:hover {
+            border-color: var(--purple);
+            transform: translateY(-2px)
+        }
+
+        .asset-card.signal-call {
+            border-color: var(--green);
+            box-shadow: 0 0 20px rgba(16, 185, 129, .15)
+        }
+
+        .asset-card.signal-put {
+            border-color: var(--red);
+            box-shadow: 0 0 20px rgba(239, 68, 68, .15)
+        }
+
+        .asset-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px
+        }
+
+        /* 🟢 Strategy Board (Glass) */
+        .strategy-board {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 16px;
+            margin: 0 16px 16px 16px;
+            background: linear-gradient(145deg, rgba(15, 23, 41, 0.6), rgba(15, 23, 41, 0.3));
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            backdrop-filter: blur(12px);
+            min-height: 50px;
+            align-items: center;
+        }
+
+        .strategy-board-title {
+            width: 100%;
+            font-size: 14px;
+            color: var(--t1);
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .asset-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: var(--t1);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .asset-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+        }
+
+        .asset-btn.call {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.05));
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);
+        }
+
+        .asset-btn.call span {
+            color: var(--green);
+            background: rgba(16, 185, 129, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .asset-btn.put {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.05));
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.15);
+        }
+
+        .asset-btn.put span {
+            color: var(--red);
+            background: rgba(239, 68, 68, 0.15);
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+        }
+
+        .asset-name {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: .5px
+        }
+
+        .asset-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--t2)
+        }
+
+        /* Gauge */
+        .gauge-wrap {
+            display: flex;
+            justify-content: center;
+            margin: 8px 0;
+            pointer-events: none
+        }
+
+        .gauge-svg {
+            width: 180px;
+            height: 100px
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: #1e293b;
+            stroke-width: 12;
+            stroke-linecap: round
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dashoffset .8s ease, stroke .5s
+        }
+
+        .gauge-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            text-anchor: middle;
+            fill: var(--t1);
+        }
+
+        .gauge-label {
+            font-size: 9px;
+            text-anchor: middle;
+            fill: var(--t3);
+            text-transform: uppercase;
+            letter-spacing: 1px
+        }
+
+        /* Signal Badge */
+        .signal-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .signal-badge.call {
+            background: rgba(16, 185, 129, .12);
+            color: var(--green)
+        }
+
+        .signal-badge.put {
+            background: rgba(239, 68, 68, .12);
+            color: var(--red)
+        }
+
+        .signal-badge.wait {
+            background: rgba(71, 85, 105, .12);
+            color: var(--t3)
+        }
+
+        .signal-strat {
+            font-size: 11px;
+            color: var(--t2);
+            margin-top: 4px
+        }
+
+        /* Info row */
+        .info-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            pointer-events: none
+        }
+
+        .info-chip {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(59, 130, 246, .08);
+            color: var(--blue);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tick-count {
+            font-size: 10px;
+            color: var(--t3);
+            position: absolute;
+            top: 8px;
+            right: 12px
+        }
+
+        /* Signal Log */
+        .log-section {
+            padding: 0 24px 24px;
+        }
+
+        .log-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .log-box::-webkit-scrollbar {
+            width: 5px
+        }
+
+        .log-box::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px
+        }
+
+        .log-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--t2)
+        }
+
+        .log-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            animation: fadeIn .3s;
+        }
+
+        .log-row:hover {
+            background: rgba(255, 255, 255, .02)
+        }
+
+        .log-row .time {
+            color: var(--t3);
+            min-width: 60px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px
+        }
+
+        .log-row .asset {
+            min-width: 50px;
+            font-weight: 600;
+            color: var(--purple);
+            cursor: pointer
+        }
+
+        .log-row .badge {
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 36px;
+            text-align: center
+        }
+
+        .log-row .badge.c {
+            background: rgba(16, 185, 129, .12);
+            color: var(--green)
+        }
+
+        .log-row .badge.p {
+            background: rgba(239, 68, 68, .12);
+            color: var(--red)
+        }
+
+        .log-row .strat {
+            color: var(--t2)
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .volume-ctrl {
+            display: flex;
+            align-items: center;
+            gap: 4px
+        }
+
+        .volume-ctrl input[type=range] {
+            width: 50px;
+            accent-color: var(--purple)
+        }
+
+        /* Glass Panel */
+        .glass-panel {
+            background: rgba(139, 92, 246, 0.1);
+            transition: background 0.3s;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--t1);
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .glass-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .glass-label {
+            color: #ffffff;
+            font-size: 10px;
+        }
+
+        .glass-val {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .glass-val.green {
+            color: var(--green);
+        }
+
+        .glass-val.red {
+            color: var(--red);
+        }
+
+        .glass-val.yellow {
+            color: var(--yellow);
+        }
+
+        /* Charts within card */
+        .card-charts {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 300px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #0f1629;
+        }
+
+        .mini-main-chart {
+            flex: 1;
+            width: 100%;
+            min-height: 0;
+        }
+
+        .mini-choppy-chart {
+            height: 80px;
+            width: 100%;
+            flex-shrink: 0;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="top-bar">
+        <h1>⚡ Multi-Asset Choppy Monitor</h1>
+        <div class="top-controls">
+            <label>Update (sec):</label>
+            <input type="number" id="updateInterval" value="5" min="1" max="60" style="width:50px">
+            <label>App ID:</label>
+            <input type="text" id="appId" value="66726" style="width:60px">
+            <div class="volume-ctrl">
+                <span style="font-size:13px">🔊</span>
+                <input type="range" id="vol" min="0" max="100" value="60">
+            </div>
+            <span id="statusText" style="font-size:12px;color:var(--t3)">Offline</span>
+            <span class="dot" id="statusDot"></span>
+            <button class="btn btn-go" id="btnStart" onclick="startAll()" disabled>▶ Connect</button>
+            <button class="btn btn-stop" id="btnStop" onclick="stopAll()" style="display:none">■ Stop</button>
+        </div>
+    </div>
+
+    <div
+        style="background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--t2);">
+        <label>EMA Short: <input type="number" id="ema1_p" value="20"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+            <select id="ema1_t"
+                style="background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+                <option>EMA</option>
+                <option>SMA</option>
+                <option>WMA</option>
+            </select>
+        </label>
+        <label>EMA Med: <input type="number" id="ema2_p" value="50"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+            <select id="ema2_t"
+                style="background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+                <option>EMA</option>
+                <option>SMA</option>
+                <option>WMA</option>
+            </select>
+        </label>
+        <label>EMA Long: <input type="number" id="ema3_p" value="200"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+            <select id="ema3_t"
+                style="background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;">
+                <option>EMA</option>
+                <option>SMA</option>
+                <option>WMA</option>
+            </select>
+        </label>
+        <label>RSI: <input type="number" id="rsi_p" value="14"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;"></label>
+        <label>BB Period: <input type="number" id="bb_p" value="20"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;"></label>
+        <label>Choppy: <input type="number" id="ci_p" value="14"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;"></label>
+        <label>ATR Per: <input type="number" id="atr_p" value="14"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;"></label>
+        <label>ATR x: <input type="number" id="atr_m" value="2.0" step="0.1"
+                style="width:40px; background:var(--bg); border:1px solid var(--border); color:var(--t1); border-radius:4px;"></label>
+
+        <label style="margin-left: 10px; border-left: 1px solid var(--border); padding-left: 10px;">
+            Charts per Row:
+            <select id="gridCols" onchange="updateGridLayout()"
+                style="background:var(--bg); border:1px solid var(--border); color:var(--purple); border-radius:4px; font-weight: bold; width: 60px;">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="auto">Auto</option>
+            </select>
+        </label>
+
+        <button class="btn" onclick="applySettings()"
+            style="background: var(--purple); color:#fff; padding:4px 10px; font-size:11px; margin-left: auto;">⚙️ Apply
+            Params</button>
+    </div>
+
+    <!-- 🎯 Strategy Board Container -->
+    <div class="strategy-board" id="strategyBoard">
+        <div class="strategy-board-title">🎯 Ready to Trade (อัปเดตทุก 1 นาที)</div>
+        <div id="strategyList" style="display:flex; flex-wrap:wrap; gap:10px; width:100%;">
+            <span style="color:var(--t2); font-size:12px;">กำลังสแกนหาจังหวะเทรด...</span>
+        </div>
+    </div>
+
+    <div class="grid" id="assetGrid"></div>
+
+    <div class="log-section">
+        <div class="log-title">📋 Signal Log (CALL / PUT only)</div>
+        <div class="log-box" id="logBox"></div>
+    </div>
+
+    <script src="strategy_engine.js"></script>
+    <script src="strategy_cpu_worker.js"></script>
+    <script type="module">
+        // Import แค่ path เพื่อส่งไปให้ Worker ถ้าเราใช้ Module 
+        // ไม่ต้อง init wasm ในหน้า HTML แล้ว
+        let wasmReady = false;
+
+        // เปลี่ยนกระบวนการเตรียมความพร้อมเป็นการสร้าง Worker แทน
+        window.addEventListener('load', () => {
+            // เราจะให้ ASSETS สร้าง Worker ตอน initState
+            document.getElementById('statusText').textContent = "Ready to start";
+            document.getElementById('btnStart').disabled = false;
+        });
+
+        window.applySettings = function () {
+            const newOpts = getWasmOptions();
+            ASSETS.forEach(a => {
+                const s = assetState[a.symbol];
+                if (s && s.generator_worker) {
+                    // Re-build Options และ State ผ่านทาง postMessage
+                    s.generator_worker.updateOptions(newOpts, s.candles);
+                }
+            });
+            alert("✅ อัปเดตการตั้งค่า และส่งไปให้ Worker เรียบร้อย");
+        };
+
+        window.updateGridLayout = function () {
+            const val = document.getElementById('gridCols').value;
+            const grid = document.getElementById('assetGrid');
+            if (val === 'auto') {
+                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
+            } else {
+                grid.style.gridTemplateColumns = `repeat(${val}, 1fr)`;
+            }
+        };
+
+        function getWasmOptions() {
+            return {
+                ema1_period: parseInt(document.getElementById('ema1_p').value) || 20,
+                ema1_type: document.getElementById('ema1_t').value || "EMA",
+                ema2_period: parseInt(document.getElementById('ema2_p').value) || 50,
+                ema2_type: document.getElementById('ema2_t').value || "EMA",
+                ema3_period: parseInt(document.getElementById('ema3_p').value) || 200,
+                ema3_type: document.getElementById('ema3_t').value || "EMA",
+                rsi_period: parseInt(document.getElementById('rsi_p').value) || 14,
+                bb_period: parseInt(document.getElementById('bb_p').value) || 20,
+                ci_period: parseInt(document.getElementById('ci_p').value) || 14,
+                atr_period: parseInt(document.getElementById('atr_p').value) || 14,
+                atr_multiplier: parseFloat(document.getElementById('atr_m').value) || 2.0,
+                adx_period: 14,
+                flat_threshold: 0.2,
+                macd_narrow: 0.15
+            };
+        }
+
+        // ==========================================
+        //  Config
+        // ==========================================
+        const ASSETS = [
+            { symbol: "R_10", name: "Vol 10" },
+            { symbol: "R_25", name: "Vol 25" },
+            { symbol: "R_50", name: "Vol 50" },
+            { symbol: "R_75", name: "Vol 75" },
+            { symbol: "R_100", name: "Vol 100" },
+            { symbol: "1HZ10V", name: "Vol 10 (1s)" },
+            { symbol: "1HZ25V", name: "Vol 25 (1s)" },
+            { symbol: "1HZ50V", name: "Vol 50 (1s)" },
+            { symbol: "1HZ75V", name: "Vol 75 (1s)" },
+            { symbol: "1HZ100V", name: "Vol 100 (1s)" },
+        ];
+
+        const CI_PERIOD = 14;
+        const MAX_CANDLES = 200; // Limit history in JS memory
+
+        // ==========================================
+        //  State
+        // ==========================================
+        let assetState = {};
+        let ws = null;
+        let running = false;
+        let updateTimer = null;
+        let audioCtx = null;
+        let historyLoaded = {};
+
+        // Chart logic
+        let chartObj = null;
+        let currentChartSymbol = null;
+        let seriesCandle, seriesEmaS, seriesEmaM, seriesEmaL, seriesBBU, seriesBBM, seriesBBL, seriesChoppy;
+
+        function initState() {
+            const wasmPath = '../../RustLib/indicator_math/wasm_dist/indicatorMath_ULTRA_Rust.js';
+            const workerUrl = 'strategy_worker.js';
+
+            ASSETS.forEach(a => {
+                const workerClient = new StrategyCPUWorker();
+                workerClient.setup(workerUrl, wasmPath, getWasmOptions()).then(() => {
+                    // โหลด History ได้เมื่อ Worker พร้อม
+                    const s = assetState[a.symbol];
+                    if (s && s.candles.length > 0) {
+                        workerClient.loadHistory(s.candles);
+                    }
+                });
+
+                // callback เมื่อ Worker คิดเสร็จ
+                workerClient.onAnalysis = (analysis) => {
+                    const s = assetState[a.symbol];
+                    if (s) s.latestAnalysis = analysis;
+                };
+
+                workerClient.onSignal = (signal) => {
+                    const sym = a.symbol;
+                    const st = assetState[sym];
+                    if (st) {
+                        st.lastSignal = signal;
+                        updateSignalUI(sym, signal, st.latestAnalysis ? st.latestAnalysis.ema_short_direction : "Flat");
+                        addLog(sym, signal);
+                        if (signal.action !== "WAIT" && !st.blockTrade) {
+                            playBeep(signal.action);
+                            st.blockTrade = true;
+                            setTimeout(() => st.blockTrade = false, 5000);
+                        }
+                    }
+                };
+
+                assetState[a.symbol] = {
+                    ticks: [],
+                    candles: [],       // {time,open,high,low,close}
+                    currentCandle: null,
+                    lastMinute: -1,
+                    choppy: null,
+                    lastPrice: null,
+                    tickCount: 0,
+                    lastSignal: { action: "WAIT", strategy: "—" },
+                    markers: [],       // {time, position, color, shape, text}
+                    generator_worker: workerClient, // เปลี่ยนมาใช้ worker แทน generator ตรงๆ
+                    latestAnalysis: null,
+                    // Chart instances
+                    chartObj: null,
+                    choppyChartObj: null,
+                    series: {}
+                };
+            });
+        }
+
+        // ==========================================
+        //  Math Helpers (MA, BB, Choppy) for UI Charts
+        // ==========================================
+        function calcSMA(data, period) {
+            if (!data || data.length === 0) return [];
+            return data.map((d, i) => {
+                if (i < period - 1) return { time: d.time, value: null };
+                let sum = 0;
+                for (let j = i - period + 1; j <= i; j++) sum += data[j].close;
+                return { time: d.time, value: sum / period };
+            });
+        }
+        function calcWMA(data, period) {
+            if (!data || data.length === 0) return [];
+            const denom = (period * (period + 1)) / 2;
+            return data.map((d, i) => {
+                if (i < period - 1) return { time: d.time, value: null };
+                let sum = 0;
+                for (let j = 0; j < period; j++) sum += data[i - j].close * (period - j);
+                return { time: d.time, value: sum / denom };
+            });
+        }
+        function calcEMA(data, period) {
+            if (!data || data.length === 0) return [];
+            const k = 2 / (period + 1);
+            let ema = data[0].close;
+            return data.map((d, i) => {
+                if (i === 0) { ema = d.close; } else { ema = (d.close - ema) * k + ema; }
+                return { time: d.time, value: i < period - 1 ? null : ema };
+            });
+        }
+        function calcMA(type, data, period) {
+            if (type === "SMA") return calcSMA(data, period);
+            if (type === "WMA") return calcWMA(data, period);
+            return calcEMA(data, period); // Fallback to EMA
+        }
+        function calcBB(data, period, mult) {
+            if (!data || data.length === 0) return { u: [], m: [], l: [] };
+            const upper = [], middle = [], lower = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    upper.push({ time: data[i].time, value: null });
+                    middle.push({ time: data[i].time, value: null });
+                    lower.push({ time: data[i].time, value: null });
+                    continue;
+                }
+                let sum = 0;
+                for (let j = i - period + 1; j <= i; j++) sum += data[j].close;
+                const sma = sum / period;
+                let sumSq = 0;
+                for (let j = i - period + 1; j <= i; j++) sumSq += Math.pow(data[j].close - sma, 2);
+                const std = Math.sqrt(sumSq / period);
+                middle.push({ time: data[i].time, value: sma });
+                upper.push({ time: data[i].time, value: sma + (std * mult) });
+                lower.push({ time: data[i].time, value: sma - (std * mult) });
+            }
+            return { u: upper, m: middle, l: lower };
+        }
+        function calcChoppy(candles, period) {
+            if (candles.length < period + 1) return null;
+            const recent = candles.slice(-period - 1);
+            let atrSum = 0;
+            let highest = -Infinity, lowest = Infinity;
+            for (let i = 1; i <= period; i++) {
+                const c = recent[i], p = recent[i - 1];
+                const tr = Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+                atrSum += tr;
+                if (c.high > highest) highest = c.high;
+                if (c.low < lowest) lowest = c.low;
+            }
+            const range = highest - lowest;
+            if (range <= 0) return 50;
+            const ci = 100 * Math.log10(atrSum / range) / Math.log10(period);
+            return Math.max(0, Math.min(100, ci));
+        }
+        function calcChoppySeries(data, period) {
+            const res = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period) { res.push({ time: data[i].time, value: null }); continue; }
+                const slice = data.slice(i - period, i + 1);
+                res.push({ time: data[i].time, value: calcChoppy(slice, period) });
+            }
+            return res;
+        }
+
+        // ==========================================
+        //  Build UI Cards
+        // ==========================================
+        function buildCards() {
+            const grid = document.getElementById('assetGrid');
+            grid.innerHTML = '';
+            ASSETS.forEach(a => {
+                const card = document.createElement('div');
+                card.className = 'asset-card';
+                card.id = 'card-' + a.symbol;
+                card.innerHTML = `
+            <span class="tick-count" id="tick-${a.symbol}">0 ticks</span>
+            
+            <div class="card-top" style="display:flex; gap:16px; margin-bottom:12px; width:100%; flex-wrap:wrap;">
+                
+                <div class="card-meta" style="flex:1;">
+                    <div class="asset-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                        <span class="asset-name">${a.symbol}</span>
+                        <div style="text-align:right">
+                            <div class="asset-price" id="price-${a.symbol}">—</div>
+                            <div class="server-clock" id="clock-${a.symbol}" style="font-size:10px; color:var(--blue); font-family:monospace;">00:00:00</div>
+                        </div>
+                    </div>
+                    <div class="info-row" id="info-${a.symbol}" style="margin:0; gap:4px; flex-direction:column; align-items:flex-start;"></div>
+                    <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+                        <span class="signal-badge wait" id="badge-${a.symbol}" style="margin:0;">WAIT</span>
+                        <div class="signal-strat" id="strat-${a.symbol}" style="margin:0;">—</div>
+                    </div>
+                </div>
+                
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div class="gauge-wrap" style="margin:0; align-self:flex-start;">
+                        <svg class="gauge-svg" viewBox="0 0 180 110" style="width:130px;height:80px;">
+                            <defs>
+                                <linearGradient id="grad-${a.symbol}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#10b981"/>
+                                    <stop offset="40%" style="stop-color:#f59e0b"/>
+                                    <stop offset="70%" style="stop-color:#ef4444"/>
+                                    <stop offset="100%" style="stop-color:#dc2626"/>
+                                </linearGradient>
+                            </defs>
+                            <path class="gauge-bg" d="M 20 90 A 70 70 0 0 1 160 90"/>
+                            <path class="gauge-fill" id="fill-${a.symbol}" d="M 20 90 A 70 70 0 0 1 160 90"
+                                stroke="url(#grad-${a.symbol})" stroke-dasharray="220" stroke-dashoffset="220"/>
+                            <g id="needle-${a.symbol}" transform="rotate(-90, 90, 90)">
+                                <polygon points="88,90 92,90 90.5,30 89.5,30" fill="#e2e8f0"/>
+                                <line x1="90" y1="90" x2="90" y2="30" stroke="#f1f5f9" stroke-width="3" stroke-linecap="round"/>
+                            </g>
+                            <circle cx="90" cy="90" r="6" fill="#8b5cf6"/>
+                            <circle cx="90" cy="90" r="3" fill="#c4b5fd"/>
+                            <text class="gauge-value" id="gval-${a.symbol}" x="90" y="82">—</text>
+                            <text class="gauge-label" x="90" y="100">CHOPPY</text>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="glass-panel" id="glass-${a.symbol}">
+                    <div class="glass-row"><span class="glass-label">EMA Dirs</span><span class="glass-val" id="g-ema-${a.symbol}">-</span></div>
+                    <div class="glass-row"><span class="glass-label">RSI State</span><span class="glass-val" id="g-rsi-${a.symbol}">-</span></div>
+                    <div class="glass-row"><span class="glass-label">BB State</span><span class="glass-val" id="g-bb-${a.symbol}">-</span></div>
+                    <div class="glass-row"><span class="glass-label">ATR State</span><span class="glass-val" id="g-atr-${a.symbol}">-</span></div>
+                    <div class="glass-row"><span class="glass-label">Choppy</span><span class="glass-val" id="g-ci-${a.symbol}">-</span></div>
+                    <div class="glass-row" style="margin-top:4px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.05); flex-direction:column; align-items:flex-start;">
+                        <span class="glass-label" style="margin-bottom:2px; font-weight:bold; color:var(--purple)">วิเคราะห์ความสอดคล้องสรุป</span>
+                        <span class="glass-val" id="g-summary-${a.symbol}" style="font-size:13px; font-weight:bold; line-height:1.4;">กำลังสแกน...</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="card-charts">
+                <div class="mini-main-chart" id="chartMain-${a.symbol}"></div>
+                <div class="mini-choppy-chart" id="chartCi-${a.symbol}"></div>
+            </div>
+        `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        //  UI Updates
+        // ==========================================
+        function updateGauge(symbol, choppy) {
+            if (choppy == null) return;
+            const val = Math.max(0, Math.min(100, choppy));
+            const pct = val / 100;
+            const fill = document.getElementById('fill-' + symbol);
+            if (fill) fill.setAttribute('stroke-dashoffset', 220 - (pct * 220));
+            const angle = -90 + (pct * 180);
+            const needle = document.getElementById('needle-' + symbol);
+            if (needle) needle.setAttribute('transform', `rotate(${angle}, 90, 90)`);
+            const gval = document.getElementById('gval-' + symbol);
+            if (gval) {
+                gval.textContent = val.toFixed(1);
+                gval.style.fill = val < 38.2 ? '#10b981' : val < 50 ? '#3b82f6' : val <= 61.8 ? '#f59e0b' : '#ef4444';
+            }
+        }
+
+        function updateSignalUI(symbol, signal, shortEmaDir = "Flat") {
+            const card = document.getElementById('card-' + symbol);
+            const badge = document.getElementById('badge-' + symbol);
+            const strat = document.getElementById('strat-' + symbol);
+            const glass = document.getElementById('glass-' + symbol);
+            if (!card || !badge) return;
+
+            card.classList.remove('signal-call', 'signal-put');
+            badge.classList.remove('call', 'put', 'wait');
+            strat.style.color = ''; // reset custom color
+            badge.style.color = '';
+            badge.style.background = '';
+            if (glass) glass.style.background = 'rgba(139, 92, 246, 0.1)';
+
+            if (signal.action === "CALL") {
+                card.classList.add('signal-call');
+                badge.className = 'signal-badge call';
+                badge.textContent = '▲ CALL';
+                if (glass) glass.style.background = 'rgba(16, 185, 129, 0.15)'; // Greenish Glass
+            } else if (signal.action === "PUT") {
+                card.classList.add('signal-put');
+                badge.className = 'signal-badge put';
+                badge.textContent = '▼ PUT';
+                if (glass) glass.style.background = 'rgba(239, 68, 68, 0.15)'; // Reddish Glass
+            } else {
+                badge.className = 'signal-badge wait';
+                badge.textContent = 'WAIT';
+                // Apply dynamic color based on trend
+                if (shortEmaDir === "Up") {
+                    strat.style.color = 'var(--green)';
+                    badge.style.color = 'var(--green)';
+                    badge.style.background = 'rgba(16, 185, 129, 0.08)';
+                } else if (shortEmaDir === "Down") {
+                    strat.style.color = 'var(--red)';
+                    badge.style.color = 'var(--red)';
+                    badge.style.background = 'rgba(239, 68, 68, 0.08)';
+                } else {
+                    strat.style.color = 'var(--t2)';
+                }
+            }
+            strat.textContent = signal.strategy;
+        }
+
+        // ==========================================
+        //  Chart Integration (Lightweight Charts)
+        // ==========================================
+        function initCardCharts(symbol) {
+            const s = assetState[symbol];
+            if (!s || s.chartObj) return; // already initialized
+
+            const mainDiv = document.getElementById('chartMain-' + symbol);
+            const ciDiv = document.getElementById('chartCi-' + symbol);
+
+            // ===== Main Chart =====
+            s.chartObj = LightweightCharts.createChart(mainDiv, {
+                autoSize: true,
+                layout: { background: { type: 'solid', color: '#0f1629' }, textColor: '#b2b5be', fontSize: 10 },
+                grid: { vertLines: { color: '#1a2744' }, horzLines: { color: '#1a2744' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: '#1a2744' },
+                timeScale: {
+                    borderColor: '#1a2744',
+                    timeVisible: true,
+                    secondsVisible: false,
+                    borderVisible: false,
+                    tickMarkFormatter: (time) => {
+                        return new Date(time * 1000).toLocaleTimeString('th-TH', {
+                            timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false
+                        });
+                    }
+                },
+                localization: {
+                    timeFormatter: (time) => {
+                        return new Date(time * 1000).toLocaleTimeString('th-TH', {
+                            timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                        });
+                    }
+                }
+            });
+
+            s.series.candle = s.chartObj.addCandlestickSeries({
+                upColor: '#10b981', downColor: '#ef4444', borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#ef4444'
+            });
+            s.series.ema1 = s.chartObj.addLineSeries({ color: '#fcd34d', lineWidth: 1, title: 'EMA1', lastValueVisible: false, priceLineVisible: false });
+            s.series.ema2 = s.chartObj.addLineSeries({ color: '#f59e0b', lineWidth: 2, title: 'EMA2', lastValueVisible: false, priceLineVisible: false });
+            s.series.ema3 = s.chartObj.addLineSeries({ color: '#dc2626', lineWidth: 2, title: 'EMA3', lastValueVisible: false, priceLineVisible: false });
+            s.series.bbu = s.chartObj.addLineSeries({ color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'BB+', lastValueVisible: false, priceLineVisible: false });
+            s.series.bbm = s.chartObj.addLineSeries({ color: '#3b82f6', lineWidth: 1, title: 'BB', lastValueVisible: false, priceLineVisible: false });
+            s.series.bbl = s.chartObj.addLineSeries({ color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'BB-', lastValueVisible: false, priceLineVisible: false });
+
+            // ===== Choppy Sub-Chart =====
+            s.choppyChartObj = LightweightCharts.createChart(ciDiv, {
+                autoSize: true,
+                layout: { background: { type: 'solid', color: '#0f1629' }, textColor: '#b2b5be', fontSize: 10 },
+                grid: { vertLines: { color: '#1a2744' }, horzLines: { color: '#1a2744' } },
+                rightPriceScale: { borderColor: '#1a2744', autoScale: false, scaleMargins: { top: 0.05, bottom: 0.05 } },
+                timeScale: { visible: false }, // hide timescale on mini subchart to save space
+                localization: {
+                    timeFormatter: (time) => {
+                        return new Date(time * 1000).toLocaleTimeString('th-TH', {
+                            timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                        });
+                    }
+                }
+            });
+            s.series.ci = s.choppyChartObj.addLineSeries({ color: '#8b5cf6', lineWidth: 1, title: 'CI' });
+            s.series.ci.createPriceLine({ price: 61.8, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'D' });
+            s.series.ci.createPriceLine({ price: 50.0, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'C' });
+            s.series.ci.createPriceLine({ price: 38.2, color: '#10b981', lineWidth: 1, lineStyle: 2, title: 'A' });
+
+            // Sync scroll
+            s.chartObj.timeScale().subscribeVisibleLogicalRangeChange(range => {
+                if (range && s.choppyChartObj) s.choppyChartObj.timeScale().setVisibleLogicalRange(range);
+            });
+        }
+
+        function populateChartHistory(symbol) {
+            const s = assetState[symbol];
+            if (!s || !s.chartObj || !s.candles.length) return;
+
+            const pEma1 = parseInt(document.getElementById('ema1_p').value) || 20;
+            const tEma1 = document.getElementById('ema1_t').value || "EMA";
+            const pEma2 = parseInt(document.getElementById('ema2_p').value) || 50;
+            const tEma2 = document.getElementById('ema2_t').value || "EMA";
+            const pEma3 = parseInt(document.getElementById('ema3_p').value) || 200;
+            const tEma3 = document.getElementById('ema3_t').value || "EMA";
+            const pBb = parseInt(document.getElementById('bb_p').value) || 20;
+            const pCi = parseInt(document.getElementById('ci_p').value) || 14;
+
+            s.series.candle.setData(s.candles);
+            s.series.ema1.setData(calcMA(tEma1, s.candles, pEma1).filter(x => x.value !== null));
+            s.series.ema2.setData(calcMA(tEma2, s.candles, pEma2).filter(x => x.value !== null));
+            s.series.ema3.setData(calcMA(tEma3, s.candles, pEma3).filter(x => x.value !== null));
+
+            const bb = calcBB(s.candles, pBb, 2);
+            s.series.bbu.setData(bb.u.filter(x => x.value !== null));
+            s.series.bbm.setData(bb.m.filter(x => x.value !== null));
+            s.series.bbl.setData(bb.l.filter(x => x.value !== null));
+            if (s.markers.length > 0) s.series.candle.setMarkers(s.markers);
+
+            s.series.ci.setData(calcChoppySeries(s.candles, pCi).filter(x => x.value !== null));
+        }
+
+        // ==========================================
+        //  Processing
+        // ==========================================
+        function processTick(symbol, price, epoch) {
+            const s = assetState[symbol];
+            if (!s) return;
+            s.lastPrice = price;
+            s.tickCount++;
+
+            document.getElementById('price-' + symbol).textContent = price.toFixed(symbol.startsWith('1HZ') ? 2 : 2);
+            document.getElementById('tick-' + symbol).textContent = s.tickCount + ' ticks';
+
+            const minute = Math.floor(epoch / 60);
+
+            if (s.lastMinute === -1) {
+                s.lastMinute = minute;
+                s.currentCandle = { time: minute * 60, open: price, high: price, low: price, close: price };
+                return;
+            }
+
+            let candleUpdated = false;
+            let newCandleCreated = false;
+
+            if (minute === s.lastMinute) {
+                // Update current candle
+                const c = s.currentCandle;
+                if (price > c.high) c.high = price;
+                if (price < c.low) c.low = price;
+                c.close = price;
+                candleUpdated = true;
+            } else {
+                // Close candle → push
+                if (s.currentCandle) {
+                    s.candles.push({ ...s.currentCandle });
+                    if (s.candles.length > MAX_CANDLES) s.candles.shift();
+                }
+                s.lastMinute = minute;
+                s.currentCandle = { time: minute * 60, open: price, high: price, low: price, close: price };
+                newCandleCreated = true;
+            }
+
+            // Update Live Chart
+            if (s.chartObj && s.currentCandle) {
+                s.series.candle.update(s.currentCandle);
+                if (newCandleCreated) {
+                    const pEma1 = parseInt(document.getElementById('ema1_p').value) || 20;
+                    const tEma1 = document.getElementById('ema1_t').value || "EMA";
+                    const pEma2 = parseInt(document.getElementById('ema2_p').value) || 50;
+                    const tEma2 = document.getElementById('ema2_t').value || "EMA";
+                    const pEma3 = parseInt(document.getElementById('ema3_p').value) || 200;
+                    const tEma3 = document.getElementById('ema3_t').value || "EMA";
+                    const pBb = parseInt(document.getElementById('bb_p').value) || 20;
+                    const pCi = parseInt(document.getElementById('ci_p').value) || 14;
+
+                    // Update indicators for new permanent candle
+                    const vEma1 = calcMA(tEma1, s.candles, pEma1).filter(x => x.value !== null);
+                    if (vEma1.length) s.series.ema1.update(vEma1[vEma1.length - 1]);
+
+                    const vEma2 = calcMA(tEma2, s.candles, pEma2).filter(x => x.value !== null);
+                    if (vEma2.length) s.series.ema2.update(vEma2[vEma2.length - 1]);
+
+                    const vEma3 = calcMA(tEma3, s.candles, pEma3).filter(x => x.value !== null);
+                    if (vEma3.length) s.series.ema3.update(vEma3[vEma3.length - 1]);
+
+                    const bb = calcBB(s.candles, pBb, 2);
+                    if (bb.u.length && bb.u[bb.u.length - 1].value !== null) {
+                        s.series.bbu.update(bb.u[bb.u.length - 1]);
+                        s.series.bbm.update(bb.m[bb.m.length - 1]);
+                        s.series.bbl.update(bb.l[bb.l.length - 1]);
+                    }
+                    const ciData = calcChoppySeries(s.candles, pCi).filter(x => x.value !== null);
+                    if (ciData.length) s.series.ci.update(ciData[ciData.length - 1]);
+                }
+            }
+
+            // Update Clock (Force Thai Time)
+            const clockEl = document.getElementById('clock-' + symbol);
+            if (clockEl) {
+                const dateThai = new Date(epoch * 1000).toLocaleTimeString('th-TH', {
+                    timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                });
+                clockEl.textContent = `💻 ${dateThai}`;
+            }
+
+            // WASM Append Tick ผ่าน Worker
+            if (s.generator_worker && s.generator_worker.ready) {
+                s.generator_worker.onTick(price, Math.floor(epoch));
+            }
+        }
+
+        function runAnalysis() {
+            ASSETS.forEach(a => {
+                const s = assetState[a.symbol];
+                if (!s.latestAnalysis) return;
+
+                const analysis = s.latestAnalysis;
+
+                const choppy = analysis.choppy_indicator;
+                s.choppy = choppy;
+                updateGauge(a.symbol, choppy);
+
+                const signal = evaluateAllStrategies(analysis);
+                s.lastSignal = signal;
+                updateSignalUI(a.symbol, signal, analysis.ema_short_direction);
+
+                // Record Signal Marker
+                if (signal.action !== "WAIT" && s.currentCandle) {
+                    const time = s.currentCandle.time;
+                    // distinct markers check
+                    if (!s.markers.find(m => m.time === time && m.shape === (signal.action === 'CALL' ? 'arrowUp' : 'arrowDown'))) {
+                        s.markers.push({
+                            time: time,
+                            position: signal.action === 'CALL' ? 'belowBar' : 'aboveBar',
+                            color: signal.action === 'CALL' ? '#10b981' : '#ef4444',
+                            shape: signal.action === 'CALL' ? 'arrowUp' : 'arrowDown',
+                            text: signal.strategy
+                        });
+                        // update live chart marker
+                        s.markers.sort((x, y) => x.time - y.time);
+                        if (s.chartObj) {
+                            s.series.candle.setMarkers(s.markers);
+                        }
+                    }
+                }
+
+                // 🚨 Abnormal ATR Check & Visuals
+                if (analysis.is_abnormal_atr && s.currentCandle) {
+                    const time = s.currentCandle.time;
+                    s.currentCandle.color = '#d946ef'; // ระบายสีแท่งเทียนเป็นสีม่วงชมพู
+                    s.currentCandle.wickColor = '#d946ef';
+
+                    if (s.chartObj) {
+                        s.series.candle.update(s.currentCandle);
+                    }
+
+                    if (!s.markers.find(m => m.time === time && m.text === 'Abnormal ATR')) {
+                        s.markers.push({
+                            time: time,
+                            position: 'aboveBar',
+                            color: '#d946ef',
+                            shape: 'circle',
+                            text: 'Abnormal ATR'
+                        });
+
+                        s.markers.sort((x, y) => x.time - y.time);
+                        if (s.chartObj) {
+                            s.series.candle.setMarkers(s.markers);
+                        }
+                    }
+                }
+
+                // Update Glass Panel Data
+                const gEma = document.getElementById('g-ema-' + a.symbol);
+                const gRsi = document.getElementById('g-rsi-' + a.symbol);
+                const gBb = document.getElementById('g-bb-' + a.symbol);
+                const gAtr = document.getElementById('g-atr-' + a.symbol);
+                const gCi = document.getElementById('g-ci-' + a.symbol);
+
+                if (gEma) {
+                    const e1 = analysis.ema_short_direction;
+                    const e2 = analysis.ema_medium_direction;
+                    const e3 = analysis.ema_long_direction;
+                    let emaState = "ขัดแย้งกัน ⚔️";
+                    gEma.className = 'glass-val';
+                    if (e1 === e2 && e2 === e3) {
+                        if (e1 === "Up") { emaState = "ขึ้นพร้อมกัน 📈"; }
+                        else if (e1 === "Down") { emaState = "ลงพร้อมกัน 📉"; }
+                        else { emaState = "ราบเรียบ ➖"; }
+                    }
+                    gEma.textContent = emaState;
+                }
+
+                if (gRsi && analysis.rsi_value) {
+                    let rsiSt = "แกว่งตัวกลาง ⚖️";
+                    gRsi.className = 'glass-val';
+                    if (analysis.rsi_value > 70) { rsiSt = "OverBought ⚠️"; }
+                    else if (analysis.rsi_value < 30) { rsiSt = "OverSell 🟢"; }
+                    gRsi.textContent = rsiSt;
+                }
+
+                if (gCi) {
+                    let ciSt = "";
+                    gCi.className = 'glass-val';
+                    if (choppy < 38.2) { ciSt = "เทรนแรงมาก 🔥"; }
+                    else if (choppy < 50) { ciSt = "เริ่มมีเทรน 🚀"; }
+                    else if (choppy <= 61.8) { ciSt = "พักตัว ⏸"; }
+                    else { ciSt = "บีบอัด/ไร้ทิศ 🎯"; }
+                    gCi.textContent = ciSt;
+                }
+
+                if (gAtr && analysis.atr) {
+                    let atrSt = `ปกติ (${analysis.atr.toFixed(4)})`;
+                    gAtr.className = 'glass-val';
+                    if (analysis.is_abnormal_atr) {
+                        atrSt = `ผิดปกติ 💥 (${analysis.atr.toFixed(4)})`;
+                        gAtr.style.color = '#d946ef';
+                    } else {
+                        gAtr.style.color = '';
+                    }
+                    gAtr.textContent = atrSt;
+                }
+
+                if (gBb) {
+                    let bbState = "ปกติ";
+                    const pBb = parseInt(document.getElementById('bb_p').value) || 20;
+                    if (s.candles.length >= pBb + 1) {
+                        const bbInfo = calcBB(s.candles.slice(-pBb - 2), pBb, 2);
+                        const uData = bbInfo.u.filter(x => x.value !== null);
+                        const lData = bbInfo.l.filter(x => x.value !== null);
+                        if (uData.length >= 2 && lData.length >= 2) {
+                            const lastU = uData[uData.length - 1].value;
+                            const lastL = lData[lData.length - 1].value;
+                            const prevU = uData[uData.length - 2].value;
+                            const prevL = lData[lData.length - 2].value;
+
+                            // Check conditions with a tiny threshold to avoid micro-fluctuations
+                            if (lastU > prevU && lastL < prevL) bbState = "ถ่างออก (ระเบิด) 💥";
+                            else if (lastU < prevU && lastL > prevL) bbState = "ลู่เข้า (บีบอัด) 📉";
+                            else if (lastU > prevU && lastL > prevL) bbState = "ยกตัวขึ้น ↗";
+                            else if (lastU < prevU && lastL < prevL) bbState = "มุดตัวลง ↘";
+                            else bbState = "ขนานกัน ⏸";
+                        }
+                    }
+                    gBb.textContent = bbState;
+                }
+
+                const gSum = document.getElementById('g-summary-' + a.symbol);
+                if (gSum) {
+                    let summary = "";
+                    let upScore = 0;
+                    let downScore = 0;
+
+                    const emaState = gEma ? gEma.textContent : "";
+                    const bbState = gBb ? gBb.textContent : "";
+
+                    // EMA Check
+                    if (emaState.includes("ขึ้นพร้อมกัน")) upScore += 2;
+                    else if (emaState.includes("ลงพร้อมกัน")) downScore += 2;
+
+                    // RSI Check
+                    if (analysis.rsi_value > 65) downScore += 1;
+                    if (analysis.rsi_value < 35) upScore += 1;
+
+                    // BB Check
+                    if (bbState.includes("ยกตัวขึ้น")) upScore += 1;
+                    else if (bbState.includes("มุดตัวลง")) downScore += 1;
+                    else if (bbState.includes("ถ่างออก")) {
+                        if (upScore > downScore) upScore += 1;
+                        else if (downScore > upScore) downScore += 1;
+                    }
+
+                    // Choppy Trend Filter
+                    if (choppy < 50) { // Has Trend
+                        if (upScore >= 3) summary = "กระทิงดุ! อินดิเคเตอร์สอดคล้องดันราคาขึ้น 🚀";
+                        else if (downScore >= 3) summary = "หมีตะปบ! อินดิเคเตอร์ดึงราคาลงแข็งแกร่ง 📉";
+                        else if (upScore > downScore) summary = "แรงซื้อเริ่มได้เปรียบ ระวังการย่อตัว 🟢";
+                        else if (downScore > upScore) summary = "แรงขายกดดันเข้าทำ ระวังการเด้งกลับ 🔴";
+                        else summary = "เทรนมีพลัง แต่เครื่องมือขัดแย้งกันขั่วขณะ ⚠️";
+                    } else { // Choppy / No Trend
+                        summary = "ไซด์เวย์/พักตัว รอความชัดเจน ⏳";
+                    }
+
+                    // Override if EMAs are totally contradicting and it's not a strong trend
+                    if (emaState === "ขัดแย้งกัน" && choppy >= 50) {
+                        summary = "เส้น EMA พันกันรุนแรง ควรชะลอการเทรด 🚫";
+                    }
+
+                    gSum.innerHTML = summary;
+
+                    // Color the summary text lightly
+                    if (summary.includes("🚀") || summary.includes("🟢")) gSum.style.color = "var(--green)";
+                    else if (summary.includes("📉") || summary.includes("🔴")) gSum.style.color = "var(--red)";
+                    else if (summary.includes("⚠️") || summary.includes("⏳") || summary.includes("🚫")) gSum.style.color = "var(--yellow)";
+                    else gSum.style.color = "var(--t1)";
+                }
+
+                const info = document.getElementById('info-' + a.symbol);
+                if (info) {
+                    const zone = choppy < 38.2 ? 'A' : choppy < 50 ? 'B' : choppy <= 61.8 ? 'C' : 'D';
+                    info.innerHTML = `
+                <span class="info-chip">CI: ${(choppy || 0).toFixed(1)}</span>
+                <span class="info-chip">Zone ${zone}</span>
+                <span class="info-chip">${s.candles.length} candles</span>
+            `;
+                }
+
+                if (signal.action !== "WAIT" && signal.action !== s._lastLogged) {
+                    addLog(a.symbol, signal);
+                    playBeep(signal.action);
+                    s._lastLogged = signal.action;
+                } else if (signal.action === "WAIT") {
+                    s._lastLogged = null;
+                }
+            });
+
+            // อัปเดตบอร์ดสรุปคู่เงินที่ควรเทรด (สแกนจากสภาวะล่าสุด)
+            updateStrategyBoard();
+        }
+
+        function updateStrategyBoard() {
+            const listDiv = document.getElementById('strategyList');
+            if (!listDiv) return;
+
+            let html = '';
+            let count = 0;
+
+            ASSETS.forEach(a => {
+                const s = assetState[a.symbol];
+                if (!s || !s.lastSignal) return;
+
+                const sig = s.lastSignal.action;
+                // แสดงเฉพาะ CALL / PUT บนบอร์ดนี้
+                if (sig === "CALL" || sig === "PUT") {
+                    count++;
+                    const btnClass = sig === "CALL" ? "call" : "put";
+                    const icon = sig === "CALL" ? "▲" : "▼";
+                    html += `
+                        <button class="asset-btn ${btnClass}" onclick="scrollToAsset('${a.symbol}')">
+                            ${a.name} <span>${icon} ${sig}</span>
+                        </button>
+                    `;
+                }
+            });
+
+            if (count > 0) {
+                listDiv.innerHTML = html;
+            } else {
+                listDiv.innerHTML = `<span style="color:var(--t2); font-size:12px;">พักการเทรด (Wait) - ยังไม่มีคู่เงินไหนเข้าเงื่อนไขชัดเจนในนาทีนี้</span>`;
+            }
+        }
+
+        window.scrollToAsset = function (symbol) {
+            const card = document.getElementById('card-' + symbol);
+            if (card) {
+                // เลื่อนหน้าจอไปให้ส่วนที่เลือกอยู่ตรงกลาง
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // กระพริบเน้น card นั้น
+                const oldShadow = card.style.boxShadow;
+                card.style.transition = 'box-shadow 0.3s ease-in-out';
+                card.style.boxShadow = '0 0 30px 10px rgba(255, 255, 255, 0.3)';
+
+                setTimeout(() => {
+                    card.style.boxShadow = oldShadow || '';
+                }, 1000);
+            }
+        }
+
+        function connectDeriv() {
+            const appId = document.getElementById('appId').value || '66726';
+            ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${appId}`);
+
+            ws.onopen = () => {
+                setStatus(true);
+                historyLoaded = {};
+                ASSETS.forEach(a => {
+                    ws.send(JSON.stringify({
+                        ticks_history: a.symbol,
+                        adjust_start_time: 1,
+                        count: 250,
+                        end: "latest",
+                        granularity: 60,
+                        style: "candles"
+                    }));
+                });
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.candles && msg.echo_req && msg.echo_req.ticks_history) {
+                        const symbol = msg.echo_req.ticks_history;
+                        const s = assetState[symbol];
+                        if (s && !historyLoaded[symbol]) {
+                            s.candles = msg.candles.map(c => ({
+                                time: c.epoch, open: parseFloat(c.open), high: parseFloat(c.high), low: parseFloat(c.low), close: parseFloat(c.close)
+                            }));
+                            if (s.candles.length > 0) {
+                                const last = s.candles[s.candles.length - 1];
+                                s.lastMinute = Math.floor(last.time / 60);
+                                s.lastPrice = last.close;
+                                s.currentCandle = { ...last };
+                                document.getElementById('price-' + symbol).textContent = last.close.toFixed(2);
+
+                                // Push to Worker
+                                if (s.generator_worker && s.generator_worker.ready) {
+                                    s.generator_worker.loadHistory(s.candles);
+                                }
+                                // Init Mini Charts
+                                if (!s.chartObj) {
+                                    initCardCharts(symbol);
+                                }
+                                populateChartHistory(symbol);
+                            }
+                            historyLoaded[symbol] = true;
+                            console.log(`✅ [${symbol}] History loaded (passed to WASM)`);
+
+                            ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
+                        }
+                    }
+
+                    if (msg.tick) {
+                        processTick(msg.tick.symbol, parseFloat(msg.tick.quote), msg.tick.epoch);
+                    }
+                } catch (err) { }
+            };
+
+            ws.onclose = () => {
+                setStatus(false);
+                if (running) setTimeout(connectDeriv, 3000);
+            };
+
+            ws.onerror = () => setStatus(false);
+        }
+
+        function startAll() {
+            if (running) return;
+            running = true;
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'inline-block';
+            initState();
+            buildCards();
+            connectDeriv();
+            const sec = parseInt(document.getElementById('updateInterval').value) || 5;
+            updateTimer = setInterval(runAnalysis, sec * 1000);
+        }
+
+        function stopAll() {
+            running = false;
+            document.getElementById('btnStart').style.display = 'inline-block';
+            document.getElementById('btnStop').style.display = 'none';
+            if (ws) { ws.close(); ws = null; }
+            if (updateTimer) { clearInterval(updateTimer); updateTimer = null; }
+            setStatus(false);
+        }
+
+        function setStatus(on) {
+            document.getElementById('statusDot').classList.toggle('on', on);
+            document.getElementById('statusText').textContent = on ? 'Connected' : 'Offline';
+        }
+
+        function playBeep(type) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const vol = document.getElementById('vol').value / 100;
+            if (vol === 0) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === "CALL") {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime + .1);
+            } else {
+                osc.type = 'square'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime + .1);
+            }
+            gain.gain.setValueAtTime(vol * .3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + .3);
+            osc.start(); osc.stop(audioCtx.currentTime + .3);
+        }
+
+        function addLog(symbol, signal) {
+            const box = document.getElementById('logBox');
+            const t = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const bc = signal.action === 'CALL' ? 'c' : 'p';
+            const row = document.createElement('div');
+            row.className = 'log-row';
+            row.innerHTML = `
+        <span class="time">${t}</span>
+        <span class="asset" onclick="window.openChart('${symbol}')">${symbol}</span>
+        <span class="badge ${bc}">${signal.action}</span>
+        <span class="strat">${signal.strategy}</span>
+    `;
+            box.insertBefore(row, box.firstChild);
+            while (box.children.length > 50) box.removeChild(box.lastChild);
+        }
+
+        // Expose functions to window since we are in a module
+        window.startAll = startAll;
+        window.stopAll = stopAll;
+
+        buildCards();
+        window.updateGridLayout(); // Initialize grid layout
+    </script>
+</body>
+
+</html>
