@@ -53,6 +53,18 @@
             out.innerText += "Loading Wasm module...\n";
 
             try {
+                // Polyfill for wgpu 0.20 limits rename in modern Chrome
+                if (navigator.gpu) {
+                    const originalRequestDevice = GPUAdapter.prototype.requestDevice;
+                    GPUAdapter.prototype.requestDevice = function(descriptor) {
+                        if (descriptor && descriptor.requiredLimits && "maxInterStageShaderComponents" in descriptor.requiredLimits) {
+                            descriptor.requiredLimits["maxInterStageShaderVariables"] = descriptor.requiredLimits["maxInterStageShaderComponents"];
+                            delete descriptor.requiredLimits["maxInterStageShaderComponents"];
+                        }
+                        return originalRequestDevice.call(this, descriptor);
+                    };
+                }
+
                 // Initialize the wasm module
                 await init();
                 out.innerText += "✅ Wasm loaded successfully!\n\n";
