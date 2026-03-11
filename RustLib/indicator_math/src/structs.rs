@@ -1,5 +1,46 @@
 use serde::{Deserialize, Serialize};
 
+/// Tick-level analysis for a completed 1-minute candle.
+/// Tracks how volatile each tick was (Volatility Clustering)
+/// and the ratio of buy vs sell ticks.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TickVolatility {
+    /// Total number of ticks received during this candle
+    pub tick_count: u32,
+    /// Number of ticks where price went UP (buy pressure)
+    pub buy_tick_count: u32,
+    /// Number of ticks where price went DOWN (sell pressure)
+    pub sell_tick_count: u32,
+    /// Buy / (Buy + Sell) ratio: >0.5 = more buys, <0.5 = more sells
+    pub buy_sell_ratio: f64,
+    /// Average absolute price change per tick (in price units)
+    pub avg_tick_move: f64,
+    /// Maximum single-tick price change (largest spike)
+    pub max_tick_move: f64,
+    /// Sum of all absolute tick moves (total distance traveled)
+    pub sum_tick_move: f64,
+    /// Standard deviation of tick moves - high = clustered volatility, low = calm
+    pub volatility_clustering: f64,
+    /// Volatility level label: "Low", "Medium", "High"
+    pub volatility_level: String,
+}
+
+impl Default for TickVolatility {
+    fn default() -> Self {
+        Self {
+            tick_count: 0,
+            buy_tick_count: 0,
+            sell_tick_count: 0,
+            buy_sell_ratio: 0.5,
+            avg_tick_move: 0.0,
+            max_tick_move: 0.0,
+            sum_tick_move: 0.0,
+            volatility_clustering: 0.0,
+            volatility_level: "Low".to_string(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct Candle {
     pub time: u64,
@@ -128,6 +169,10 @@ pub struct AnalysisResult {
 
     // Indicators
     pub choppy_indicator: Option<f64>,
+    #[serde(rename = "ciDirection")]
+    pub ci_direction: String,
+    #[serde(rename = "ciDirectionList")]
+    pub ci_direction_list: Vec<String>,
     pub adx_value: Option<f64>,
     pub rsi_value: Option<f64>,
 
@@ -170,6 +215,9 @@ pub struct AnalysisResult {
     
     // SMC Implementation
     pub smc: Option<crate::smc::SmcResult>,
+
+    // Tick-level volatility & buy/sell analysis
+    pub tick_volatility: TickVolatility,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

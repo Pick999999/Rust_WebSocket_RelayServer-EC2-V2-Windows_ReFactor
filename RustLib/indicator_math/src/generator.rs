@@ -1,6 +1,116 @@
-use crate::structs::{AnalysisOptions, AnalysisResult, BBValues, Candle, CandleMasterCode};
+use crate::structs::{
+    AnalysisOptions, AnalysisResult, BBValues, Candle, CandleMasterCode, TickVolatility,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+
+/// Accumulates tick-level data while a candle is being built.
+/// Reset at the start of each new 1-minute candle.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TickAccumulator {
+    pub tick_count: u32,
+    pub buy_tick_count: u32,
+    pub sell_tick_count: u32,
+    pub last_tick_price: f64,
+    /// Sum of |price_change| for each tick
+    pub sum_abs_move: f64,
+    /// Sum of (price_change)^2 for each tick (for std dev)
+    pub sum_sq_move: f64,
+    /// Max absolute single-tick move seen
+    pub max_abs_move: f64,
+}
+
+impl TickAccumulator {
+    pub fn new(initial_price: f64) -> Self {
+        Self {
+            tick_count: 1, // the opening tick counts
+            buy_tick_count: 0,
+            sell_tick_count: 0,
+            last_tick_price: initial_price,
+            sum_abs_move: 0.0,
+            sum_sq_move: 0.0,
+            max_abs_move: 0.0,
+        }
+    }
+
+    /// Record a new tick price and classify it as buy/sell
+    pub fn record_tick(&mut self, price: f64) {
+        let change = price - self.last_tick_price;
+        let abs_change = change.abs();
+
+        self.tick_count += 1;
+
+        if change > 0.0 {
+            self.buy_tick_count += 1;
+        } else if change < 0.0 {
+            self.sell_tick_count += 1;
+        }
+        // change == 0.0 -> neutral, neither buy nor sell
+
+        self.sum_abs_move += abs_change;
+        self.sum_sq_move += abs_change * abs_change;
+        if abs_change > self.max_abs_move {
+            self.max_abs_move = abs_change;
+        }
+
+        self.last_tick_price = price;
+    }
+
+    /// Finalize into a TickVolatility snapshot when the candle completes
+    pub fn finalize(&self) -> TickVolatility {
+        let _n = self.tick_count as f64;
+        let moves_count = (self.buy_tick_count + self.sell_tick_count) as f64;
+
+        let avg_tick_move = if moves_count > 0.0 {
+            self.sum_abs_move / moves_count
+        } else {
+            0.0
+        };
+
+        // Standard deviation of tick moves (volatility clustering measure)
+        // Using population std dev: sqrt(E[X^2] - (E[X])^2)
+        let volatility_clustering = if moves_count > 1.0 {
+            let mean = self.sum_abs_move / moves_count;
+            let mean_sq = self.sum_sq_move / moves_count;
+            let variance = (mean_sq - mean * mean).max(0.0);
+            variance.sqrt()
+        } else {
+            0.0
+        };
+
+        let buy_sell_ratio = if moves_count > 0.0 {
+            self.buy_tick_count as f64 / moves_count
+        } else {
+            0.5 // neutral when no movement
+        };
+
+        // Classify volatility level based on ratio of std_dev to avg_move
+        let volatility_level = if avg_tick_move == 0.0 {
+            "Low".to_string()
+        } else {
+            let cv = volatility_clustering / avg_tick_move; // coefficient of variation
+            if cv > 1.0 {
+                "High".to_string()
+            } else if cv > 0.5 {
+                "Medium".to_string()
+            } else {
+                "Low".to_string()
+            }
+        };
+
+        TickVolatility {
+            tick_count: self.tick_count,
+            buy_tick_count: self.buy_tick_count,
+            sell_tick_count: self.sell_tick_count,
+            buy_sell_ratio,
+            avg_tick_move,
+            max_tick_move: self.max_abs_move,
+            sum_tick_move: self.sum_abs_move,
+            volatility_clustering,
+            volatility_level,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeneratorState {
@@ -41,6 +151,8 @@ pub struct GeneratorState {
     pub ci_window: VecDeque<Candle>,
     pub ci_atr_window: VecDeque<f64>,
     pub ci_period: usize,
+    pub last_ci_value: Option<f64>,
+    pub ci_direction_history: VecDeque<String>,
 
     // Config cache
     pub ema_1_k: f64,
@@ -55,6 +167,9 @@ pub struct GeneratorState {
     // Ideally O(1) HMA is hard. We might need O(N) over window.
     pub close_window: VecDeque<f64>, // For types needing window like HMA
     pub max_ma_period: usize,
+
+    // Tick accumulator for volatility & buy/sell tracking
+    pub tick_accumulator: Option<TickAccumulator>,
 }
 
 impl GeneratorState {
@@ -94,12 +209,16 @@ impl GeneratorState {
             ci_window: VecDeque::with_capacity(options.ci_period),
             ci_atr_window: VecDeque::with_capacity(options.ci_period),
             ci_period: options.ci_period,
+            last_ci_value: None,
+            ci_direction_history: VecDeque::with_capacity(10),
             ema_1_k: 2.0 / (options.ema1_period as f64 + 1.0),
             ema_2_k: 2.0 / (options.ema2_period as f64 + 1.0),
             ema_3_k: 2.0 / (options.ema3_period as f64 + 1.0),
 
             close_window: VecDeque::with_capacity(buffer_size),
             max_ma_period: buffer_size,
+
+            tick_accumulator: None,
         }
     }
 }
@@ -112,6 +231,7 @@ pub struct AnalysisGenerator {
     pub candle_data: Vec<Candle>,
     pub current_candle: Option<Candle>,
     pub master_codes: std::sync::Arc<Vec<CandleMasterCode>>,
+    pub smc_state: crate::smc::SmcIndicator,
 }
 
 impl AnalysisGenerator {
@@ -120,6 +240,7 @@ impl AnalysisGenerator {
         master_codes: std::sync::Arc<Vec<CandleMasterCode>>,
     ) -> Self {
         let state = GeneratorState::new(&options);
+        let smc_state = crate::smc::SmcIndicator::new(crate::smc::SmcConfig::default());
         Self {
             options,
             state,
@@ -127,6 +248,7 @@ impl AnalysisGenerator {
             candle_data: Vec::new(),
             current_candle: None,
             master_codes,
+            smc_state,
         }
     }
 
@@ -297,6 +419,15 @@ impl AnalysisGenerator {
     }
 
     pub fn append_candle(&mut self, new_candle: Candle) -> AnalysisResult {
+        self.append_candle_with_tick_data(new_candle, None)
+    }
+
+    /// Internal: append candle with optional tick volatility data
+    fn append_candle_with_tick_data(
+        &mut self,
+        new_candle: Candle,
+        tick_vol: Option<TickVolatility>,
+    ) -> AnalysisResult {
         let i = self.analysis_array.len();
         let prev_candle = self.state.last_candle; // Copy
 
@@ -666,6 +797,24 @@ impl AnalysisGenerator {
             None
         };
 
+        let ci_direction = match (self.state.last_ci_value, choppy_indicator) {
+            (Some(prev), Some(curr)) => {
+                let diff = curr - prev;
+                if diff > 0.0001 {
+                    "Up".to_string()
+                } else if diff < -0.0001 {
+                    "Down".to_string()
+                } else {
+                    "Flat".to_string()
+                }
+            }
+            _ => "Flat".to_string(),
+        };
+
+        let mut current_history = self.state.ci_direction_history.clone();
+        current_history.push_back(ci_direction.clone());
+        let ci_direction_list: Vec<String> = current_history.into_iter().collect();
+
         // 7. ADX
         let mut adx_value = None;
         if let Some(p) = prev_candle {
@@ -884,11 +1033,10 @@ impl AnalysisGenerator {
 
         let _display_time = ""; // Need Chrono formatting
 
-        // Calculate SMC
-        let mut smc_ind = crate::smc::SmcIndicator::new(crate::smc::SmcConfig::default());
-        let smc_result = smc_ind.calculate(self.candle_data.as_slice());
+        // Statefully update SMC for this candle
+        let smc_result = self.smc_state.append_candle(new_candle);
 
-        let mut analysis_obj = AnalysisResult {
+        let analysis_obj = AnalysisResult {
             index: i,
             candletime: new_candle.time,
             candletime_display: "".to_string(), // TODO
@@ -930,6 +1078,8 @@ impl AnalysisGenerator {
             ema_convergence_type: Some(ema_convergence_type),
             ema_long_convergence_type,
             choppy_indicator,
+            ci_direction: ci_direction.clone(),
+            ci_direction_list,
             adx_value,
             rsi_value,
             bb_values: BBValues {
@@ -964,6 +1114,7 @@ impl AnalysisGenerator {
             win_con: 0,
             loss_con: 0,
             smc: Some(smc_result),
+            tick_volatility: tick_vol.unwrap_or_default(),
         };
 
         // Update next color of previous
@@ -986,6 +1137,12 @@ impl AnalysisGenerator {
         self.state.down_con_long_ema = down_con_long_ema;
         self.state.last_ema_cut_index = last_ema_cut_index;
 
+        self.state.last_ci_value = choppy_indicator;
+        self.state.ci_direction_history.push_back(ci_direction);
+        if self.state.ci_direction_history.len() > 9 {
+            self.state.ci_direction_history.pop_front();
+        }
+
         self.state.prev_analysis = self.state.last_analysis.clone();
         self.state.last_analysis = Some(analysis_obj.clone());
         self.state.last_candle = Some(new_candle);
@@ -998,14 +1155,21 @@ impl AnalysisGenerator {
 
         if let Some(mut current) = self.current_candle {
             if time >= current.time + 60 {
-                // Or robust check: tick_minute > current.time
                 // Complete previous candle
                 let completed_candle = current; // Copy
 
-                // Analyze it
-                let result = self.append_candle(completed_candle);
+                // Finalize tick volatility data for the completed candle
+                let tick_vol = self
+                    .state
+                    .tick_accumulator
+                    .as_ref()
+                    .map(|acc| acc.finalize());
 
-                // Start new candle
+                // Analyze it with tick data
+                let result =
+                    self.append_candle_with_tick_data(completed_candle, tick_vol);
+
+                // Start new candle & reset tick accumulator
                 self.current_candle = Some(Candle {
                     time: tick_minute,
                     open: price,
@@ -1013,14 +1177,21 @@ impl AnalysisGenerator {
                     low: price,
                     close: price,
                 });
+                self.state.tick_accumulator = Some(TickAccumulator::new(price));
 
                 Some(result)
             } else {
-                // Update current
+                // Update current candle
                 current.high = current.high.max(price);
                 current.low = current.low.min(price);
                 current.close = price;
                 self.current_candle = Some(current);
+
+                // Record tick for volatility & buy/sell tracking
+                if let Some(ref mut acc) = self.state.tick_accumulator {
+                    acc.record_tick(price);
+                }
+
                 None
             }
         } else {
@@ -1032,6 +1203,7 @@ impl AnalysisGenerator {
                 low: price,
                 close: price,
             });
+            self.state.tick_accumulator = Some(TickAccumulator::new(price));
             None
         }
     }

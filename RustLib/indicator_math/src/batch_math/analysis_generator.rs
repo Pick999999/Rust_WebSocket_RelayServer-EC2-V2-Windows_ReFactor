@@ -12,7 +12,7 @@ use std::collections::HashMap;
 // ============================================================
 
 /// Embedded mapping from StatusDesc to SeriesCode
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 struct MasterRecord {
@@ -64,7 +64,7 @@ pub fn lookup_series_code(status_desc: &str) -> Option<u32> {
 // Bollinger Band Position
 // ============================================================
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BbPosition {
     NearUpper,
     Middle,
@@ -87,7 +87,7 @@ impl BbPosition {
 // Full Analysis Result Struct
 // ============================================================
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullAnalysis {
     // Basic Info
     pub index: usize,
@@ -139,6 +139,10 @@ pub struct FullAnalysis {
 
     // Additional Indicators
     pub choppy_indicator: Option<f64>,
+    #[serde(rename = "ciDirection")]
+    pub ci_direction: String,
+    #[serde(rename = "ciDirectionList")]
+    pub ci_direction_list: Vec<String>,
     pub adx_value: Option<f64>,
     pub rsi_value: Option<f64>,
 
@@ -408,6 +412,7 @@ impl AnalysisGenerator {
         let mut down_con_medium_ema = 0usize;
         let mut up_con_long_ema = 0usize;
         let mut down_con_long_ema = 0usize;
+        let mut ci_direction_history: std::collections::VecDeque<String> = std::collections::VecDeque::with_capacity(10);
 
         for i in 0..self.candles.len() {
             let candle = &self.candles[i];
@@ -646,6 +651,35 @@ impl AnalysisGenerator {
 
             // Additional indicators
             let ci_value = self.ci_data.get(i).map(|v| v.value).filter(|v| !v.is_nan());
+            let prev_ci_value = if i > 0 {
+                self.ci_data.get(i - 1).map(|v| v.value).filter(|v| !v.is_nan())
+            } else {
+                None
+            };
+
+            let ci_direction = match (prev_ci_value, ci_value) {
+                (Some(prev), Some(curr)) => {
+                    let diff = curr - prev;
+                    if diff > 0.0001 {
+                        "Up".to_string()
+                    } else if diff < -0.0001 {
+                        "Down".to_string()
+                    } else {
+                        "Flat".to_string()
+                    }
+                }
+                _ => "Flat".to_string(),
+            };
+
+            let mut current_ci_history = ci_direction_history.clone();
+            current_ci_history.push_back(ci_direction.clone());
+            let ci_direction_list: Vec<String> = current_ci_history.into_iter().collect();
+
+            ci_direction_history.push_back(ci_direction.clone());
+            if ci_direction_history.len() > 9 {
+                ci_direction_history.pop_front();
+            }
+
             let adx_value = self
                 .adx_data
                 .get(i)
@@ -793,6 +827,8 @@ impl AnalysisGenerator {
                 ema_convergence_type,
                 ema_long_convergence_type,
                 choppy_indicator: ci_value,
+                ci_direction,
+                ci_direction_list,
                 adx_value,
                 rsi_value,
                 bb_upper,

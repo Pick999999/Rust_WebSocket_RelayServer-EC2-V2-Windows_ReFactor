@@ -10,4 +10,4 @@ pub mod wasm;
 
 pub use generator::AnalysisGenerator;
 pub use smc::{SmcConfig, SmcIndicator, SmcResult};
-pub use structs::{AnalysisOptions, AnalysisResult, Candle, CandleMasterCode};
+pub use structs::{AnalysisOptions, AnalysisResult, Candle, CandleMasterCode, TickVolatility};

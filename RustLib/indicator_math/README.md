@@ -25,6 +25,7 @@
 * Moving Averages: **EMA**, **HMA**, **EHMA**, **WMA**
 * Momentum/Trend: **RSI**, **MACD**, **ADX**
 * Volatility: **ATR**, **Bollinger Bands**, **Choppiness Index (CI)**
+* Tick Analysis: **Volatility Clustering** (Std Dev of tick moves), **Buy/Sell Tick Ratio**
 * Smart Money Concepts (SMC): **Market Structure (CHoCH, BOS)**, **Swing Points**, **Order Blocks**, **FVG**, **Premium/Discount Zones**
 
 ### 5. 🎯 **Status Code Matching**
@@ -348,6 +349,8 @@ socket.onmessage = function(event) {
   "ema_long_convergence_type": "D",
   
   "choppy_indicator": 45.2,
+  "ciDirection": "Up",
+  "ciDirectionList": ["Flat", "Down", "Down", "Up", "Up", "Flat"],
   "adx_value": 28.5,
   "rsi_value": 65.4,
   
@@ -422,6 +425,18 @@ socket.onmessage = function(event) {
     "strong_weak_levels": [],
     "swing_trend": "bullish",
     "internal_trend": "bearish"
+  },
+
+  "tick_volatility": {
+    "tick_count": 87,
+    "buy_tick_count": 45,
+    "sell_tick_count": 38,
+    "buy_sell_ratio": 0.5421,
+    "avg_tick_move": 0.0234,
+    "max_tick_move": 0.185,
+    "sum_tick_move": 1.9422,
+    "volatility_clustering": 0.0312,
+    "volatility_level": "High"
   }
 }
 ```
@@ -451,6 +466,8 @@ socket.onmessage = function(event) {
 
 **หมวดหมู่อินดิเคเตอร์วัดระดับ (Oscillators & Volatility):**
 * `choppy_indicator`: หาความผันผวนไซด์เวย์ (ยิ่งน้อยเทรนด์ยิ่งแข็ง, ยิ่งมากวิ่งไร้ทิศทาง) 
+* `ciDirection`: บอกทิศทางของ Choppy Index ว่าเพิ่มขึ้น หรือลดลงเมื่อเทียบกับแท่งก่อนหน้า (`"Up"`, `"Down"`, `"Flat"`)
+* `ciDirectionList`: อาร์เรย์เก็บประวัติทิศทางของ Choppy Index ย้อนหลัง 10 แท่งล่าสุด (ตัวสุดท้ายคือค่าล่าสุด) ไว้ดูลักษณะแนวโน้มความผันผวนสะสม
 * `adx_value`: วัดพลังสปีดของเทรนด์ (ถ้า > 25 แปลว่าวิ่งแรง)
 * `rsi_value`: ดัชนีความแข็งของราคา ไว้หาจังหวะซื้อมากเกินไป (Overbought/Oversold)
 * `bb_values`: { `upper`, `middle`, `lower` } เส้นตำแหน่งของ Bollinger Bands ทั้ง 3 เส้น 
@@ -484,3 +501,45 @@ socket.onmessage = function(event) {
 * `status_desc`: "รหัสบรรทัดเดียวครอบจักรวาล" สูตรที่ขยำทุกอย่างมาบอกเช่น `L-DU-U-R-C` แปลความง่ายๆ = Mediumอยู่เหนือยาว(L), กลางลงแต่อุ้มสั้นขึ้น(DU), ยาวเชิดตรง(U), สีแดง(R), ถ่างออก(C)
 * `status_code`: Code ตัวเลขเช่น `"13"`, `"25"` ที่แปลงค่า Desc ให้เป็นเลขแมตช์เข้าตาราง
 * `is_mark`, `hint_status`, `suggest_color` : ส่วนรองรับอื่นๆ ไว้ฉีดสัญญาณบอกผู้ใช้ในระบบ Frontend
+
+**หมวดหมู่การวิเคราะห์ระดับ Tick (Tick-Level Volatility & Buy/Sell Ratio):**
+> ⚡ ข้อมูลชุดนี้จะมีค่าเมื่อใช้งานผ่าน `append_tick()` เท่านั้น (ระบบ Live Tick) หากป้อนข้อมูลผ่าน `append_candle()` โดยตรง จะได้ค่า default (tick_count=0)
+
+* `tick_volatility.tick_count`: จำนวน Tick ทั้งหมดที่รับมาได้ภายใน 1 นาที (ยิ่งเยอะ = ตลาดเคลื่อนไหวคึกคัก)
+* `tick_volatility.buy_tick_count`: จำนวน Tick ที่ราคา **ขึ้น** (Buy Pressure / แรงซื้อ)
+* `tick_volatility.sell_tick_count`: จำนวน Tick ที่ราคา **ลง** (Sell Pressure / แรงขาย)
+* `tick_volatility.buy_sell_ratio`: อัตราส่วน Buy/(Buy+Sell):
+  * `> 0.5` = **Buy มากกว่า** (แรงซื้อกดดัน)
+  * `< 0.5` = **Sell มากกว่า** (แรงขายกดดัน)
+  * `= 0.5` = สมดุล (Neutral)
+* `tick_volatility.avg_tick_move`: ราคาขยับเฉลี่ยต่อ 1 Tick (หน่วยราคาจริง) ใช้วัดว่านาทีนี้ราคาขยับ "น้อย" หรือ "มาก" ต่อแต่ละจังหวะ
+* `tick_volatility.max_tick_move`: ราคาขยับมากสุดใน Tick เดียว (ตรวจจับกระชากแรงฉับพลัน / Spike)
+* `tick_volatility.sum_tick_move`: ผลรวมระยะทางราคาทั้งนาที (Total Distance Traveled) ยิ่งมาก = ราคาเดินทางมาก แม้แท่งเทียนจะดูสั้น
+* `tick_volatility.volatility_clustering`: **ส่วนเบี่ยงเบนมาตรฐาน (Std Dev)** ของการขยับราคาแต่ละ Tick:
+  * ค่า **สูง** = ราคากระโดดไม่สม่ำเสมอ (Clustered Volatility) มีจังหวะนิ่งสลับกระชากแรง → **ไม่เหมาะเข้าเทรด**
+  * ค่า **ต่ำ** = ราคาขยับสม่ำเสมอ (Smooth Movement) → **เหมาะเข้าเทรดตามเทรนด์**
+* `tick_volatility.volatility_level`: สรุประดับ Volatility เป็นคำ:
+  * `"Low"` = ขยับน้อยสม่ำเสมอ (Coefficient of Variation ≤ 0.5)
+  * `"Medium"` = มีความผันผวนปานกลาง (CV 0.5–1.0)
+  * `"High"` = กระชากแรงไม่สม่ำเสมอ (CV > 1.0)
+
+**ตัวอย่างการนำ Tick Volatility ไปใช้เขียน Logic:**
+```rust
+// ตัวอย่างที่ 1: กรองไม่เข้าเทรดถ้า Volatility Clustering สูง
+if analysis.tick_volatility.volatility_level == "High" {
+    // ราคากระโดดไม่สม่ำเสมอ รอให้สงบก่อน
+    pause_trading(asset);
+}
+
+// ตัวอย่างที่ 2: ดู Buy/Sell Ratio เพื่อยืนยันทิศทาง
+if analysis.tick_volatility.buy_sell_ratio > 0.65 && analysis.ema_short_direction == "Up" {
+    // แรงซื้อ 65% + EMA ชี้ขึ้น → สัญญาณ Call แข็งแกร่ง
+    execute_trade("CALL", asset, amount);
+}
+
+// ตัวอย่างที่ 3: ดู Tick Count ว่าตลาดมีสภาพคล่องเพียงพอ
+if analysis.tick_volatility.tick_count < 10 {
+    // นาทีนี้มี Tick น้อยมาก สภาพคล่องต่ำ ไม่ควรเข้า
+    skip_this_candle();
+}
+```

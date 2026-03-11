@@ -39,4 +39,26 @@ impl WasmAnalysisGenerator {
             Ok(JsValue::NULL)
         }
     }
+
+    pub fn append_candle(&mut self, candle_json: &str) -> Result<JsValue, JsValue> {
+        let candle: Candle = serde_json::from_str(candle_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid candle JSON: {}", e)))?;
+        let result = self.internal.append_candle(candle);
+        serde_wasm_bindgen::to_value(&result)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub fn get_last_result(&self) -> Result<JsValue, JsValue> {
+        if let Some(res) = self.internal.analysis_array.last() {
+            serde_wasm_bindgen::to_value(res)
+                .map_err(|e| JsValue::from_str(&e.to_string()))
+        } else {
+            Ok(JsValue::NULL)
+        }
+    }
+
+    pub fn get_analysis_array(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(&self.internal.analysis_array)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }

@@ -145,6 +145,7 @@ impl PivotState {
     }
 }
 
+#[derive(Clone)]
 pub struct SmcIndicator {
     pub config: SmcConfig,
 
@@ -186,6 +187,10 @@ pub struct SmcIndicator {
     parsed_highs: Vec<f64>,
     parsed_lows: Vec<f64>,
     atr_values: Vec<Option<f64>>,
+    last_atr: Option<f64>,
+    tr_history: Vec<f64>,
+    sum_tr: f64,
+    cum_tr: Vec<f64>,
 }
 
 impl SmcIndicator {
@@ -221,6 +226,10 @@ impl SmcIndicator {
             parsed_highs: vec![],
             parsed_lows: vec![],
             atr_values: vec![],
+            last_atr: None,
+            tr_history: vec![],
+            sum_tr: 0.0,
+            cum_tr: vec![],
         };
         ind._reset();
         ind
@@ -261,6 +270,10 @@ impl SmcIndicator {
         self.parsed_highs.clear();
         self.parsed_lows.clear();
         self.atr_values.clear();
+        self.last_atr = None;
+        self.tr_history.clear();
+        self.sum_tr = 0.0;
+        self.cum_tr.clear();
     }
 
     fn _calculate_atr(&mut self, data: &[Candle], period: usize) -> Vec<Option<f64>> {
@@ -375,7 +388,7 @@ impl SmcIndicator {
         } else {
             self.swing_low.clone()
         };
-        let mut trend = if is_internal {
+        let trend = if is_internal {
             self.internal_trend
         } else {
             self.swing_trend
@@ -808,78 +821,87 @@ impl SmcIndicator {
 
     pub fn calculate(&mut self, data: &[Candle]) -> SmcResult {
         self._reset();
-        self.data = data.to_vec();
+        for candle in data {
+            self.append_candle(*candle);
+        }
+        self.get_all_results()
+    }
 
-        if data.is_empty() {
-            return self.get_all_results();
+    pub fn append_candle(&mut self, candle: Candle) -> SmcResult {
+        let i = self.data.len();
+        self.data.push(candle);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+        
+        let period = self.config.atr_period;
+        let tr = if i == 0 {
+            candle.high - candle.low
+        } else {
+            let prev_close = self.data[i - 1].close;
+            (candle.high - candle.low)
+                .max((candle.high - prev_close).abs())
+                .max((candle.low - prev_close).abs())
+        };
+        self.sum_tr += tr;
+        self.cum_tr.push(self.sum_tr / (i as f64 + 1.0));
+
+        self.tr_history.push(tr);
+        let current_atr = if i < period - 1 {
+            None
+        } else if i == period - 1 {
+            let sum: f64 = self.tr_history.iter().sum();
+            Some(sum / period as f64)
+        } else {
+            let prev_atr = self.last_atr.unwrap_or(0.0);
+            Some((prev_atr * (period as f64 - 1.0) + tr) / period as f64)
+        };
+        self.last_atr = current_atr;
+        self.atr_values.push(current_atr);
+
+        let volatility_measure = if self.config.order_block_filter == "atr" {
+            current_atr.unwrap_or(self.cum_tr[i])
+        } else {
+            self.cum_tr[i]
+        };
+
+        let high_volatility_bar = (candle.high - candle.low) >= 2.0 * volatility_measure;
+
+        self.parsed_highs.push(if high_volatility_bar {
+            candle.low
+        } else {
+            candle.high
+        });
+        self.parsed_lows.push(if high_volatility_bar {
+            candle.high
+        } else {
+            candle.low
+        });
+
+        if self.config.show_premium_discount {
+            self._update_trailing_extremes(i);
         }
 
-        self.highs = data.iter().map(|d| d.high).collect();
-        self.lows = data.iter().map(|d| d.low).collect();
+        self._process_swing_points(i, self.config.swing_length, false, false);
+        self._process_swing_points(i, self.config.internal_length, true, false);
 
-        self.atr_values = self._calculate_atr(data, self.config.atr_period);
-
-        let mut cum_tr = vec![];
-        let mut sum_tr = 0.0;
-
-        for i in 0..data.len() {
-            let tr = if i == 0 {
-                data[i].high - data[i].low
-            } else {
-                (data[i].high - data[i].low)
-                    .max((data[i].high - data[i - 1].close).abs())
-                    .max((data[i].low - data[i - 1].close).abs())
-            };
-            sum_tr += tr;
-            cum_tr.push(sum_tr / (i as f64 + 1.0));
-
-            let volatility_measure = if self.config.order_block_filter == "atr" {
-                self.atr_values[i].unwrap_or(cum_tr[i])
-            } else {
-                cum_tr[i]
-            };
-
-            let high_volatility_bar = (data[i].high - data[i].low) >= 2.0 * volatility_measure;
-
-            self.parsed_highs.push(if high_volatility_bar {
-                data[i].low
-            } else {
-                data[i].high
-            });
-            self.parsed_lows.push(if high_volatility_bar {
-                data[i].high
-            } else {
-                data[i].low
-            });
+        if self.config.show_equal_hl {
+            self._process_swing_points(i, self.config.equal_hl_length, false, true);
         }
 
-        for i in 0..data.len() {
-            if self.config.show_premium_discount {
-                self._update_trailing_extremes(i);
-            }
+        if self.config.show_internal_structure {
+            self._process_structure(i, self.config.internal_length, true);
+        }
+        if self.config.show_swing_structure {
+            self._process_structure(i, self.config.swing_length, false);
+        }
 
-            self._process_swing_points(i, self.config.swing_length, false, false);
-            self._process_swing_points(i, self.config.internal_length, true, false);
+        if self.config.show_order_blocks {
+            self._check_order_block_mitigation(i);
+        }
 
-            if self.config.show_equal_hl {
-                self._process_swing_points(i, self.config.equal_hl_length, false, true);
-            }
-
-            if self.config.show_internal_structure {
-                self._process_structure(i, self.config.internal_length, true);
-            }
-            if self.config.show_swing_structure {
-                self._process_structure(i, self.config.swing_length, false);
-            }
-
-            if self.config.show_order_blocks {
-                self._check_order_block_mitigation(i);
-            }
-
-            if self.config.show_fvg {
-                self._detect_fvg(i);
-                self._check_fvg_fill(i);
-            }
+        if self.config.show_fvg {
+            self._detect_fvg(i);
+            self._check_fvg_fill(i);
         }
 
         if self.config.show_premium_discount {
